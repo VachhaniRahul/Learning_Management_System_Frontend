@@ -5,9 +5,9 @@ import BaseFooter from "../partials/BaseFooter";
 import Sidebar from "./Partials/Sidebar";
 import Header from "./Partials/Header";
 
-import useAxios from "../../utils/useAxios";
 import UserData from "../plugin/UserData";
-import Toast from "../plugin/Toast";
+import api from "../../utils/axios";
+import { showToast } from "../../utils/toast";
 
 function ChangePassword() {
     const [password, setPassword] = useState({
@@ -28,24 +28,29 @@ function ChangePassword() {
         e.preventDefault();
 
         if (password.confirm_new_password !== password.new_password) {
-            Toast().fire({
-                icon: "error",
-                title: "Password does not match",
-            });
+            showToast('error', 'Password does not match')
+            return
         }
 
-        const formdata = new FormData();
-        formdata.append("user_id", UserData()?.user_id);
-        formdata.append("old_password", password.old_password);
-        formdata.append("new_password", password.new_passowrd);
-
-        await useAxios.post(`user/change-password/`, formdata).then((res) => {
+        try {
+            const res = await api.post(`user/change-password/`, {
+                user_id : UserData()?.user_id,
+                old_password : password.old_password,
+                new_password : password.new_password
+            })
             console.log(res.data);
-            Toast().fire({
-                icon: res.data.icon,
-                title: res.data.message,
-            });
-        });
+            setPassword({
+                old_password: "",
+                new_password: "",
+                confirm_new_password: "",
+            })
+            showToast('success', res.data?.message || 'Success')
+
+        } catch (error) {
+            console.log('Error', error)
+            showToast('error', error.response?.data?.message || 'Something went wrong')
+        }
+
     };
 
     return (
@@ -75,14 +80,14 @@ function ChangePassword() {
                                                 <label className="form-label" htmlFor="fname">
                                                     Old Password
                                                 </label>
-                                                <input type="password" id="password" className="form-control" placeholder="**************" required="" name="old_password" value={password.old_password} onChange={handlePasswordChange} />
+                                                <input type="password" id="password" className="form-control" placeholder="**************" required name="old_password" value={password.old_password} onChange={handlePasswordChange} />
                                             </div>
                                             {/* Last name */}
                                             <div className="mb-3 col-12 col-md-12">
                                                 <label className="form-label" htmlFor="lname">
                                                     New Password
                                                 </label>
-                                                <input type="password" id="password" className="form-control" placeholder="**************" required="" name="new_password" value={password.new_passowrd} onChange={handlePasswordChange} />
+                                                <input type="password" id="new-password" className="form-control" placeholder="**************" required name="new_password" value={password.new_password} onChange={handlePasswordChange} />
                                             </div>
 
                                             {/* Country */}
@@ -90,7 +95,7 @@ function ChangePassword() {
                                                 <label className="form-label" htmlFor="editCountry">
                                                     Confirm New Password
                                                 </label>
-                                                <input type="password" id="password" className="form-control" placeholder="**************" required="" name="confirm_new_password" value={password.confirm_new_password} onChange={handlePasswordChange} />
+                                                <input type="password" id="new-confirm-password" className="form-control" placeholder="**************" required="" name="confirm_new_password" value={password.confirm_new_password} onChange={handlePasswordChange} />
                                             </div>
                                             <div className="col-12">
                                                 {/* Button */}

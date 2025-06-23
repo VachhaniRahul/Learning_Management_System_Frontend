@@ -8,22 +8,27 @@ import BaseFooter from "../partials/BaseFooter";
 import Sidebar from "./Partials/Sidebar";
 import Header from "./Partials/Header";
 
-import useAxios from "../../utils/useAxios";
 import UserData from "../plugin/UserData";
 import Toast from "../plugin/Toast";
 import CartId from "../plugin/CartId";
 import GetCurrentAddress from "../plugin/UserCountry";
 import { CartContext } from "../plugin/Context";
+import api from "../../utils/axios";
+import { showToast } from "../../utils/toast";
 
 function Wishlist() {
     const [wishlist, setWishlist] = useState([]);
     const [cartCount, setCartCount] = useContext(CartContext);
 
-    const fetchWishlist = () => {
-        useAxios.get(`student/wishlist/${UserData()?.user_id}/`).then((res) => {
+    const fetchWishlist = async() => {
+        try {
+            const res = await api.get(`student/wishlist/${UserData()?.user_id}/`)
             console.log(res.data);
             setWishlist(res.data);
-        });
+        } catch (error) {
+            console.log('Error in wishlist', error)
+            showToast('error', 'Something went wrong in wishlist')
+        }
     };
     const country = GetCurrentAddress()?.country;
 
@@ -31,48 +36,42 @@ function Wishlist() {
         fetchWishlist();
     }, []);
 
-    const addToCart = async (courseId, userId, price, country, cartId) => {
+    const addToCart = async (courseId, userId, country, cartId) => {
         const formdata = new FormData();
 
         formdata.append("course_id", courseId);
         formdata.append("user_id", userId);
-        formdata.append("price", price);
         formdata.append("country_name", country);
         formdata.append("cart_id", cartId);
 
         try {
-            await useAxios.post(`course/cart/`, formdata).then((res) => {
-                console.log(res.data);
-                Toast().fire({
-                    title: "Added To Cart",
-                    icon: "success",
-                });
-
-                // Set cart count after adding to cart
-                useAxios
-                    .get(`course/cart-list/${CartId()}/`)
-                    .then((res) => {
-                        setCartCount(res.data?.length);
-                    });
-            });
+            const res = await api.post(`course/cart/`, formdata)
+            console.log(res.data);
+            showToast('success', 'Added To Cart')
+            const new_res = await api.get(`course/cart-list/${CartId()}/`)
+            setCartCount(new_res.data?.length);
+                
         } catch (error) {
             console.log(error);
+            showToast('error', 'Something went wrong in wishlist')
         }
     };
 
-    const addToWishlist = (courseId) => {
+    const addToWishlist = async (courseId) => {
         const formdata = new FormData();
         formdata.append("user_id", UserData()?.user_id);
         formdata.append("course_id", courseId);
-
-        useAxios.post(`student/wishlist/${UserData()?.user_id}/`, formdata).then((res) => {
-            console.log(res.data);
-            fetchWishlist();
-            Toast().fire({
-                icon: "success",
-                title: res.data.message,
-            });
-        });
+        try {
+            const res = await api.post(`student/wishlist/${UserData()?.user_id}/`, formdata)
+            console.log(res.data)
+            showToast('success', res.data.message)
+            fetchWishlist()
+        }
+        catch (error) {
+            console.log(error)
+            showToast('error', error.response?.data?.message)
+            // showToast('error', 'Something went wrong')
+        }
     };
 
     return (
@@ -96,7 +95,7 @@ function Wishlist() {
                                 <div className="col-md-12">
                                     <div className="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4">
                                         {wishlist?.map((w, index) => (
-                                            <div className="col-lg-4">
+                                            <div className="col-lg-4" key={index}>
                                                 {/* Card */}
                                                 <div className="card card-hover">
                                                     <Link to={`/course-detail/${w.course.slug}/`}>
@@ -118,25 +117,25 @@ function Wishlist() {
                                                                 <span className="badge bg-info">{w.course.level}</span>
                                                                 <span className="badge bg-success ms-2">{w.course.language}</span>
                                                             </div>
-                                                            <a onClick={() => addToWishlist(w.course?.id)} className="fs-5">
+                                                            <a onClick={() => addToWishlist(w.course?.course_id)} className="fs-5">
                                                                 <i className="fas fa-heart text-danger align-middle" />
                                                             </a>
                                                         </div>
                                                         <h4 className="mb-2 text-truncate-line-2 ">
-                                                            <Link to={`/course-detail/slug/`} className="text-inherit text-decoration-none text-dark fs-5">
+                                                            <Link to={`/course-detail/${w.course.slug}/`} className="text-inherit text-decoration-none text-dark fs-5">
                                                                 {w.course.title}
                                                             </Link>
                                                         </h4>
                                                         <small>By: {w.course?.teacher?.full_name}</small> <br />
                                                         <small>
-                                                            {w.course.students?.length} Student
+                                                            {w.course.student_count} Student
                                                             {w.course.students?.length > 1 && "s"}
                                                         </small>{" "}
                                                         <br />
                                                         <div className="lh-1 mt-3 d-flex">
                                                             <span className="align-text-top">
                                                                 <span className="fs-6">
-                                                                    <Rater total={5} rating={w.course.average_rating || 0} />
+                                                                    <Rater total={5} rating={w.course.average_rating?.avg_rating || 0} />
                                                                 </span>
                                                             </span>
                                                             <span className="text-warning">4.5</span>
@@ -147,10 +146,10 @@ function Wishlist() {
                                                     <div className="card-footer">
                                                         <div className="row align-items-center g-0">
                                                             <div className="col">
-                                                                <h5 className="mb-0">${w.course.price}</h5>
+                                                                <h5 className="mb-0">{w.course.price} RS</h5>
                                                             </div>
                                                             <div className="col-auto">
-                                                                <button type="button" onClick={() => addToCart(w.course.id, UserData()?.user_id, w.course.price, country, CartId())} className="text-inherit text-decoration-none btn btn-primary me-2">
+                                                                <button type="button" onClick={() => addToCart(w.course.id, UserData()?.user_id, country, CartId())} className="text-inherit text-decoration-none btn btn-primary me-2">
                                                                     <i className="fas fa-shopping-cart text-primary text-white" />
                                                                 </button>
                                                                 <Link to={""} className="text-inherit text-decoration-none btn btn-primary">

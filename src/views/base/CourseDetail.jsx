@@ -20,17 +20,24 @@ function CourseDetail() {
     const [isLoading, setIsLoading] = useState(true);
     const [addToCartBtn, setAddToCartBtn] = useState("Add To Cart");
     const [cartCount, setCartCount] = useContext(CartContext);
+    const [enrollCourse, setEnrollCourse] = useState([]);
+    const [enrolled, setEnrolled] = useState(false)
+    const [enId, setEnrollmentId] = useState(null)
 
     const param = useParams();
     const axiosInstance = useAxios(); // ✅ FIX: Call the hook to get axios instance
 
     const country = GetCurrentAddress().country;
-    const userId = UserData()?.user_id || 0;
+    const userId = UserData()?.user_id;
+
 
     const fetchCourse = async () => {
         try {
+
             const res = await axiosInstance.get(`course/course-detail/${param.slug}/`);
             setCourse(res.data);
+            // const cartRes = await apiInstance.get(`course/cart-list/${CartId()}/`);
+            // setCartCount(cartRes.data?.length);
             setIsLoading(false);
         } catch (error) {
             console.error('Error fetching course:', error);
@@ -38,9 +45,40 @@ function CourseDetail() {
         }
     };
 
+    const fetchEnrollCourse = async () => {
+        try {
+            const res = await apiInstance.get(`user/enrollment-course-id/${userId}/`)
+            setEnrollCourse(res.data)
+        } catch (error) {
+            console.log(error)
+            showToast('error', error.response?.data?.message || 'Something went wrong')
+        }
+    }
+
+
     useEffect(() => {
         fetchCourse();
+        fetchEnrollCourse()
+
+
     }, []);
+    useEffect(() => {
+        if (course?.course_id && Array.isArray(enrollCourse) && enrollCourse.length > 0) {
+            const matchedEnrollment = enrollCourse.find(
+                (e) => String(e.course_id) === String(course.course_id)
+            );
+
+            if (matchedEnrollment) {
+                setEnrolled(true);
+                setEnrollmentId(matchedEnrollment.enrollment_id);
+                console.log('Enrolled: true, Enrollment ID:', matchedEnrollment.enrollment_id);
+            } else {
+                setEnrolled(false);
+                setEnrollmentId(null);
+                console.log('Enrolled: false');
+            }
+        }
+    }, [course, enrollCourse]);
 
     const addToCart = async (courseId, userId, country, cartId) => {
         setAddToCartBtn("Adding To Cart");
@@ -50,6 +88,11 @@ function CourseDetail() {
         formdata.append("user_id", userId);
         formdata.append("country_name", country);
         formdata.append("cart_id", cartId);
+        if (userId === 0 || userId === 'undefined') {
+            showToast('error', 'Please login then you can add to cart')
+            setAddToCartBtn("Add To Cart");
+            return
+        }
 
         try {
             const res = await axiosInstance.post(`course/cart/`, formdata); // ✅ use axiosInstance
@@ -206,7 +249,7 @@ function CourseDetail() {
                                                                     <div id={`collapse-${c.variant_id}`} className="accordion-collapse collapse show" aria-labelledby="heading-1" data-bs-parent="#accordionExample2">
                                                                         <div className="accordion-body mt-3">
                                                                             {/* Course lecture */}
-                                                                            {c.variant_items?.map((l, index) => (
+                                                                            {c.variant_item?.map((l, index) => (
                                                                                 <>
                                                                                     <div className="d-flex justify-content-between align-items-center">
                                                                                         <div className="position-relative d-flex align-items-center">
@@ -215,7 +258,7 @@ function CourseDetail() {
                                                                                             </a>
                                                                                             <span className="d-inline-block text-truncate ms-2 mb-0 h6 fw-light w-100px w-sm-200px w-md-400px">{l.title}</span>
                                                                                         </div>
-                                                                                        <p className="mb-0">{c.content_duration}</p>
+                                                                                        <p className="mb-0">{l.content_duration}</p>
                                                                                     </div>
                                                                                     <hr />
                                                                                 </>
@@ -286,7 +329,7 @@ function CourseDetail() {
                                                                                 <h5 className="me-3 mb-0">{r?.profile?.full_name}</h5>({r?.rating}/5)
                                                                             </div>
                                                                             <p className="small mb-2">{moment(r?.date).format("MMMM D, YYYY")}</p>
-                                                                            
+
                                                                             <p className="mb-2">{r?.review || ""}</p>
                                                                         </div>
                                                                     </div>
@@ -719,7 +762,7 @@ function CourseDetail() {
                                                             {/* Price and time */}
                                                             <div>
                                                                 <div className="d-flex align-items-center">
-                                                                    <h3 className="fw-bold mb-0 me-2">${course.price}</h3>
+                                                                    <h3 className="fw-bold mb-0 me-2">{course.price} RS</h3>
                                                                 </div>
                                                             </div>
                                                             {/* Share button with dropdown */}
@@ -759,20 +802,24 @@ function CourseDetail() {
                                                         </div>
                                                         {/* Buttons */}
                                                         <div className="mt-3 d-sm-flex justify-content-sm-between ">
-                                                            {addToCartBtn === "Add To Cart" && (
-                                                                <button type="button" className="btn btn-primary mb-0 w-100 me-2 mt-3" onClick={() => addToCart(course?.id, userId,  country, CartId())}>
+                                                            {enrolled &&
+                                                                <Link to={`/student/courses/${enId}`} className="text-inherit text-decoration-none btn w-100 btn-success">
+                                                                    Go To Course <i className="fas fa-arrow-right text-white ms-2" />
+                                                                </Link>}
+                                                            {!enrolled && addToCartBtn === "Add To Cart" && (
+                                                                <button type="button" className="btn btn-primary mb-0 w-100 me-2 mt-3" onClick={() => addToCart(course?.course_id, userId, country, CartId())}>
                                                                     <i className="fas fa-shopping-cart"></i> Add To Cart
                                                                 </button>
                                                             )}
 
-                                                            {addToCartBtn === "Added To Cart" && (
-                                                                <button type="button" className="btn btn-primary mb-0 w-100 me-2 mt-3" onClick={() => addToCart(course.id, 1, "Nigeria", "8325347")}>
+                                                            {!enrolled && addToCartBtn === "Added To Cart" && (
+                                                                <button type="button" className="btn btn-primary mb-0 w-100 me-2 mt-3" onClick={() => addToCart(course.course_id, userId, country, CartId())}>
                                                                     <i className="fas fa-check-circle"></i> Added To Cart
                                                                 </button>
                                                             )}
 
-                                                            {addToCartBtn === "Adding To Cart" && (
-                                                                <button type="button" className="btn btn-primary mb-0 w-100 me-2 mt-3" onClick={() => addToCart(course.id, 1,  "Nigeria", "8325347")}>
+                                                            {!enrolled && addToCartBtn === "Adding To Cart" && (
+                                                                <button type="button" className="btn btn-primary mb-0 w-100 me-2 mt-3" onClick={() => addToCart(course.course_id, userId, country, CartId())}>
                                                                     <i className="fas fa-spinner fa-spin"></i> Adding To Cart
                                                                 </button>
                                                             )}
@@ -792,13 +839,14 @@ function CourseDetail() {
                                                             </span>
                                                             <span>{course?.lectures?.length}</span>
                                                         </li>
-                                                        <li className="list-group-item d-flex justify-content-between align-items-center d-none">
+                                                        <li className="list-group-item d-flex justify-content-between align-items-center">
                                                             <span className="h6 fw-light mb-0">
-                                                                <i className="fas fa-fw fa-clock text-primary me-2" />
+                                                                <i className="fas fa-fw fa-book-open text-primary me-2" />
                                                                 Duration
                                                             </span>
-                                                            <span>4h 50m</span>
+                                                            <span>{course?.duration || 0}</span>
                                                         </li>
+
                                                         <li className="list-group-item d-flex justify-content-between align-items-center">
                                                             <span className="h6 fw-light mb-0">
                                                                 <i className="fas fa-fw fa-signal text-primary me-2" />
@@ -818,7 +866,7 @@ function CourseDetail() {
                                                                 <i className="fas fa-fw fa-user-clock text-primary me-2" />
                                                                 Published
                                                             </span>
-                                                           <span>{moment(course?.date).format("MMMM D, YYYY")}</span>
+                                                            <span>{moment(course?.date).format("MMMM D, YYYY")}</span>
                                                         </li>
                                                     </ul>
                                                 </div>

@@ -6,7 +6,8 @@ export const showToast = (type, title, position = 'top-end') => {
     title,
     toast: true,
     position,
-    timer: 3000,
-    showConfirmButton: false
+    timer: 2000,
+    showConfirmButton: false,
+    timerProgressBar: true
   });
 };

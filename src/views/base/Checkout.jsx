@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useContext } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { PayPalButtons, PayPalScriptProvider } from "@paypal/react-paypal-js";
 
 import BaseHeader from "../partials/BaseHeader";
 import BaseFooter from "../partials/BaseFooter";
 import apiInstance from "../../utils/axios";
-import Toast from "../plugin/Toast";
-import { PAYPAL_CLIENT_ID } from "../../utils/constants";
+import { showToast } from "../../utils/toast";
 
 function Checkout() {
     const [order, setOrder] = useState([]);
@@ -21,44 +19,57 @@ function Checkout() {
             });
         } catch (error) {
             console.log(error);
+            showToast('error', 'Something went wrong in payment')
+
         }
     };
 
     const navigate = useNavigate();
+    const deleteOrder = async() => {
+        try {
+            const res = await apiInstance.delete(`order/delete-order/${order?.oid}/`)
+            if (res.status === 204){
+                navigate('/cart')
+            }
+
+        } catch (error) {
+            console.log('Error in checkout', error)
+            showToast('error', 'Something went wrong')
+            
+        }
+    }
+
 
     const applyCoupon = async () => {
         const formdata = new FormData();
-        formdata.append("order_oid", order?.oid);
+        formdata.append("order_id", order?.oid);
         formdata.append("coupon_code", coupon);
+        console.log(order)
+        console.log(coupon)
 
         try {
             await apiInstance.post(`order/coupon/`, formdata).then((res) => {
                 console.log(res.data);
                 fetchOrder();
-                Toast().fire({
-                    icon: res.data.icon,
-                    title: res.data.message,
-                });
+                // Toast().fire({
+                //     icon: res.data.icon,
+                //     title: res.data.message,
+                // });
+                showToast('success', res.data.message)
             });
         } catch (error) {
-            if (error.response.data.includes("Coupon matching query does not exi")) {
-                Toast().fire({
-                    icon: "error",
-                    title: "Coupon does not exist",
-                });
-            }
+            console.log(error)
+
+            showToast('error', error.response.data.message || error.response.data.error || 'Something went wrong in e')
         }
-    };
+    }
+
 
     useEffect(() => {
         fetchOrder();
     }, []);
 
-    const initialOptions = {
-        clientId: PAYPAL_CLIENT_ID,
-        currency: "USD",
-        intent: "capture",
-    };
+   
 
     const payWithStripe = (event) => {
         setPaymentLoading(true);
@@ -126,7 +137,7 @@ function Checkout() {
                                 <div className="table-responsive border-0 rounded-3">
                                     <table className="table align-middle p-4 mb-0">
                                         <tbody className="border-top-2">
-                                            {order?.order_items?.map((o, index) => (
+                                            {order?.order_item?.map((o, index) => (
                                                 <tr>
                                                     <td>
                                                         <div className="d-lg-flex align-items-center">
@@ -150,16 +161,17 @@ function Checkout() {
                                                         </div>
                                                     </td>
                                                     <td className="text-center">
-                                                        <h5 className="text-success mb-0">${o.price}</h5>
+                                                        <h5 className="text-success mb-0">{o.price} RS</h5>
                                                     </td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
                                 </div>
-                                <Link to={`/cart/`} className="btn btn-outline-secondary mt-3">
+                                <button onClick={() => deleteOrder()} className="btn btn-outline-secondary mt-3">
+                                    
                                     Edit Cart <i className="fas fa-edit"></i>
-                                </Link>
+                                </button>
                             </div>
 
                             <div className="shadow p-4 rounded-3 mt-5">
@@ -197,7 +209,7 @@ function Checkout() {
                                         <div className="mb-4">
                                             <div className="d-flex justify-content-between align-items-center">
                                                 <span>Transaction ID</span>
-                                                <p className="mb-0 h6 fw-light">DES23853</p>
+                                                <p className="mb-0 h6 fw-light">{order.oid}</p>
                                             </div>
                                         </div>
 
@@ -229,7 +241,7 @@ function Checkout() {
                                                 </li>
                                             </ul>
                                             <div className="d-grid">
-                                                <form action={`http://127.0.0.1:8000/api/v1/payment/stripe-checkout/${order.oid}/`} className="w-100" method="POST">
+                                                <form action={`http://127.0.0.1:8000/api/payment/stripe-chekout/${order.oid}/`} className="w-100" method="POST">
                                                     {paymentLoading === true ? (
                                                         <button type="submit" disabled className="btn btn-lg btn-success mt-2 w-100">
                                                             {" "}
@@ -243,35 +255,6 @@ function Checkout() {
                                                     )}
                                                 </form>
 
-                                                <PayPalScriptProvider options={initialOptions}>
-                                                    <PayPalButtons
-                                                        className="mt-3"
-                                                        createOrder={(data, actions) => {
-                                                            return actions.order.create({
-                                                                purchase_units: [
-                                                                    {
-                                                                        amount: {
-                                                                            currency_code: "USD",
-                                                                            value: order.total.toString(),
-                                                                        },
-                                                                    },
-                                                                ],
-                                                            });
-                                                        }}
-                                                        onApprove={(data, actions) => {
-                                                            return actions.order.capture().then((details) => {
-                                                                const name = details.payer.name.given_name;
-                                                                const status = details.status;
-                                                                const paypal_order_id = data.orderID;
-
-                                                                console.log(status);
-                                                                if (status === "COMPLETED") {
-                                                                    navigate(`/payment-success/${order.oid}/?paypal_order_id=${paypal_order_id}`);
-                                                                }
-                                                            });
-                                                        }}
-                                                    />
-                                                </PayPalScriptProvider>
                                             </div>
                                             <p className="small mb-0 mt-2 text-center">
                                                 By proceeding to payment, you agree to these{" "}

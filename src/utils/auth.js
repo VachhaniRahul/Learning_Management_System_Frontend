@@ -12,6 +12,9 @@ export const login = async (email, password) => {
         })
         if (status === 200) {
             setAuthUser(data.access, data.refresh)
+            if (data.cart_id !== 'empty') {
+                localStorage.setItem('randomString', data.cart_id)
+            }
             // alert('Login Successfull')
             showToast('success', 'Login Successful')
         }
@@ -56,6 +59,7 @@ export const register = async (full_name, email, password, confirm_password) => 
 export const logout = () => {
     Cookie.remove('access_token')
     Cookie.remove('refresh_token')
+    localStorage.removeItem('randomString')
     useAuthStore.getState().setUser(null)
     // alert('You have been logged out')
     showToast('success', 'You have been logged out')

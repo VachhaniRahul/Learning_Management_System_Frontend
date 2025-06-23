@@ -2,8 +2,8 @@ import React, { useContext } from "react";
 import { ProfileContext } from "../../plugin/Context";
 
 function Header() {
-    const [profile, setProfile] = useContext(ProfileContext);
-
+    const { profile, setProfile, loading } = useContext(ProfileContext);
+    if (loading || !profile) return <p>Loading...</p>;
     return (
         <div className="row align-items-center">
             <div className="col-xl-12 col-lg-12 col-md-12 col-12">
@@ -13,7 +13,7 @@ function Header() {
                             {profile.image && (
                                 <div className="me-2 position-relative d-flex justify-content-end align-items-end mt-n5">
                                     <img
-                                        src={profile.image}
+                                        src={profile?.image}
                                         className="avatar-xl rounded-circle border border-4 border-white"
                                         alt="Profile image"
                                         style={{
@@ -31,7 +31,7 @@ function Header() {
                             </div>
                         </div>
                         <div>
-                            <a href="profile-edit.html" className="btn btn-primary btn-sm d-none d-md-block">
+                            <a href="" className="btn btn-primary btn-sm d-none d-md-block">
                                 Account Setting <i className="fas fa-gear fa-spin"></i>
                             </a>
                         </div>

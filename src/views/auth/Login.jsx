@@ -6,11 +6,13 @@ import api from "../../utils/axios";
 import { login } from "../../utils/auth";
 import { showToast } from "../../utils/toast";
 
+
+
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
+    
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -21,6 +23,7 @@ function Login() {
       setIsLoading(false);
       showToast('error', error)
     } else {
+
       navigate("/");
       setIsLoading(false);
     }

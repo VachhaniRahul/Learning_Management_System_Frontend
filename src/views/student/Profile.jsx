@@ -4,13 +4,13 @@ import BaseFooter from "../partials/BaseFooter";
 import Sidebar from "./Partials/Sidebar";
 import Header from "./Partials/Header";
 
-import useAxios from "../../utils/useAxios";
 import UserData from "../plugin/UserData";
-import Toast from "../plugin/Toast";
 import { ProfileContext } from "../plugin/Context";
+import { showToast } from "../../utils/toast";
+import api from "../../utils/axios";
 
 function Profile() {
-    const [profile, setProfile] = useContext(ProfileContext);
+    const {profile, setProfile} = useContext(ProfileContext);
     const [profileData, setProfileData] = useState({
         image: "",
         full_name: "",
@@ -19,13 +19,19 @@ function Profile() {
     });
     const [imagePreview, setImagePreview] = useState("");
 
-    const fetchProfile = () => {
-        useAxios.get(`user/profile/${UserData()?.user_id}/`).then((res) => {
+    const fetchProfile = async () => {
+        try {
+            const res = await api.get(`user/profile/${UserData()?.user_id}/`)
             console.log(res.data);
             setProfile(res.data);
             setProfileData(res.data);
             setImagePreview(res.data.image);
-        });
+
+        } catch (error) {
+            console.log('Error in profile', error)
+            showToast('error', 'Something went wrong')
+        }
+
     };
 
     useEffect(() => {
@@ -56,32 +62,64 @@ function Profile() {
         }
     };
 
+    // const handleFormSubmit = async (e) => {
+    //     e.preventDefault();
+
+    //     const res = await api.get(`user/profile/${UserData()?.user_id}/`);
+    //     const formdata = new FormData();
+    //     if (profileData.image && profileData.image !== res.data.image) {
+    //         formdata.append("image", profileData.image);
+    //     }
+
+    //     formdata.append("full_name", profileData.full_name);
+    //     formdata.append("about", profileData.about);
+    //     formdata.append("country", profileData.country);
+
+    //     await api
+    //         .patch(`user/profile/${UserData()?.user_id}/`, formdata, {
+    //             headers: {
+    //                 "Content-Type": "multipart/form-data",
+    //             },
+    //         })
+    //         .then((res) => {
+    //             console.log(res.data);
+    //             setProfile(res.data);
+    //         });
+    // };
+
     const handleFormSubmit = async (e) => {
         e.preventDefault();
 
-        const res = await useAxios.get(`user/profile/${UserData()?.user_id}/`);
-        const formdata = new FormData();
-        if (profileData.image && profileData.image !== res.data.image) {
-            formdata.append("image", profileData.image);
-        }
+        try {
+            const user_id = UserData()?.user_id;
+            if (!user_id) throw new Error("User ID not found");
 
-        formdata.append("full_name", profileData.full_name);
-        formdata.append("about", profileData.about);
-        formdata.append("country", profileData.country);
+            const res = await api.get(`user/profile/${user_id}/`);
+            const formdata = new FormData();
 
-        await useAxios
-            .patch(`user/profile/${UserData()?.user_id}/`, formdata, {
+            if (profileData.image && profileData.image !== res.data.image) {
+                formdata.append("image", profileData.image);
+            }
+
+            formdata.append("full_name", profileData.full_name);
+            formdata.append("about", profileData.about);
+            formdata.append("country", profileData.country);
+
+            const updateRes = await api.patch(`user/profile/${user_id}/`, formdata, {
                 headers: {
                     "Content-Type": "multipart/form-data",
                 },
-            })
-            .then((res) => {
-                console.log(res.data);
-                setProfile(res.data);
             });
+
+            console.log(updateRes.data);
+            setProfile(updateRes.data);
+            showToast('success', 'Profile updated successfully')
+        } catch (error) {
+            console.error("Profile update failed", error);
+            showToast('error', 'Profile update failed')
+        }
     };
 
-    console.log(imagePreview);
 
     return (
         <>

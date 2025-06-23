@@ -8,10 +8,12 @@ import BaseHeader from "../partials/BaseHeader";
 import BaseFooter from "../partials/BaseFooter";
 import Sidebar from "./Partials/Sidebar";
 import Header from "./Partials/Header";
-import useAxios from "../../utils/useAxios";
 import UserData from "../plugin/UserData";
 import Toast from "../plugin/Toast";
 import moment from "moment";
+import api from "../../utils/axios";
+import { showToast } from "../../utils/toast";
+
 
 function CourseDetail() {
     const [course, setCourse] = useState([]);
@@ -58,11 +60,12 @@ function CourseDetail() {
     const handleQuestionShow = () => setAddQuestionShow(true);
 
     const fetchCourseDetail = async () => {
-        useAxios.get(`student/course-detail/${UserData()?.user_id}/${param.enrollment_id}/`).then((res) => {
+        api.get(`student/course-details/${param.enrollment_id}/`).then((res) => {
+            console.log(res.data)
             setCourse(res.data);
             setQuestions(res.data.question_answer);
             setStudentReview(res.data.review);
-            const percentageCompleted = (res.data.completed_lesson?.length / res.data.lectures?.length) * 100;
+            const percentageCompleted = (res.data.completed_lessons?.length / res.data.lectures?.length) * 100;
             setCompletionPercentage(percentageCompleted?.toFixed(0));
         });
     };
@@ -81,10 +84,10 @@ function CourseDetail() {
 
         const formdata = new FormData();
         formdata.append("user_id", UserData()?.user_id || 0);
-        formdata.append("course_id", course.course?.id);
+        formdata.append("course_id", course.course?.course_id);
         formdata.append("variant_item_id", variantItemId);
 
-        useAxios.post(`student/course-completed/`, formdata).then((res) => {
+        api.post(`student/course-completed/`, formdata).then((res) => {
             fetchCourseDetail();
             setMarkAsCompletedStatus({
                 ...markAsCompletedStatus,
@@ -100,30 +103,31 @@ function CourseDetail() {
         });
     };
 
+
+
     const handleSubmitCreateNote = async (e) => {
         e.preventDefault();
         const formdata = new FormData();
 
-        formdata.append("user_id", UserData()?.user_id);
         formdata.append("enrollment_id", param.enrollment_id);
         formdata.append("title", createNote.title);
         formdata.append("note", createNote.note);
-
         try {
-            await useAxios.post(`student/course-note/${UserData()?.user_id}/${param.enrollment_id}/`, formdata).then((res) => {
-                fetchCourseDetail();
-                handleNoteClose();
-                Toast().fire({
-                    icon: "success",
-                    title: "Note created",
-                });
-            });
-        } catch (error) {
-            console.log(error);
+
+            const res = await api.post(`student/course-note/`, formdata)
+            await fetchCourseDetail();
+            setCreateNote({ title: "", note: "" })
+            console.log(createNote)
+            console.log(noteShow)
+            handleNoteClose()
+            showToast('success', 'Note Created')
+        }
+        catch (error) {
+            console.log(error)
+            showToast('error', error.response?.data?.message || 'Something went wrong')
         }
     };
-
-    const handleSubmitEditNote = (e, noteId) => {
+    const handleSubmitEditNote = async (e, noteId) => {
         e.preventDefault();
         const formdata = new FormData();
 
@@ -131,24 +135,29 @@ function CourseDetail() {
         formdata.append("enrollment_id", param.enrollment_id);
         formdata.append("title", createNote.title || selectedNote?.title);
         formdata.append("note", createNote.note || selectedNote?.note);
+        try {
 
-        useAxios.patch(`student/course-note-detail/${UserData()?.user_id}/${param.enrollment_id}/${noteId}/`, formdata).then((res) => {
+            const res = await api.patch(`student/course-note-detail/${UserData()?.user_id}/${noteId}/`, formdata)
             fetchCourseDetail();
-            Toast().fire({
-                icon: "success",
-                title: "Note updated",
-            });
-        });
+            handleNoteClose()
+            showToast('success', 'Note updated')
+        }
+        catch (error) {
+            console.log(error)
+            showToast('error', error.response?.data?.message || 'Something went wrong')
+        }
     };
 
-    const handleDeleteNote = (noteId) => {
-        useAxios.delete(`student/course-note-detail/${UserData()?.user_id}/${param.enrollment_id}/${noteId}/`).then((res) => {
+    const handleDeleteNote = async (noteId) => {
+        try {
+            const res = await api.delete(`student/course-note-detail/${UserData()?.user_id}/${noteId}/`)
             fetchCourseDetail();
-            Toast().fire({
-                icon: "success",
-                title: "Note deleted",
-            });
-        });
+            handleNoteClose()
+            showToast('success', 'Note Deleted')
+        } catch (error) {
+            console.log(error)
+            showToast('error', error.response?.data?.message || 'Something went wrong')
+        }
     };
 
     const handleMessageChange = (event) => {
@@ -162,33 +171,48 @@ function CourseDetail() {
         e.preventDefault();
         const formdata = new FormData();
 
-        formdata.append("course_id", course.course?.id);
+        formdata.append("course_id", course.course?.course_id);
         formdata.append("user_id", UserData()?.user_id);
         formdata.append("title", createMessage.title);
         formdata.append("message", createMessage.message);
-
-        await useAxios.post(`student/question-answer-list-create/${course.course?.id}/`, formdata).then((res) => {
+        try {
+            const res = await api.post(`student/question-answer-list-create/`, formdata)
             fetchCourseDetail();
             handleQuestionClose();
-            Toast().fire({
-                icon: "success",
-                title: "Question sent",
-            });
-        });
+            showToast('success', 'Question Sent')
+        }
+        catch (error) {
+            console.log(error)
+            showToast('error', error.response.data?.message || 'Something went wrong')
+        }
     };
 
     const sendNewMessage = async (e) => {
         e.preventDefault();
         const formdata = new FormData();
-        formdata.append("course_id", course.course?.id);
         formdata.append("user_id", UserData()?.user_id);
         formdata.append("message", createMessage.message);
         formdata.append("qa_id", selectedConversation?.qa_id);
+        try {
 
-        useAxios.post(`student/question-answer-message-create/`, formdata).then((res) => {
-            setSelectedConversation(res.data.question);
-        });
+            const res = await api.post(`student/question-answer-message-create/`, formdata)
+            handleConversationClose()
+            setSelectedConversation(res.data.data.messages);
+            console.log(res.data.data.messages)
+            setCreateMessage(prev => ({
+                ...prev,
+                message: ''
+            }));
+            handleConversationShow(res.data.data)
+        }
+        catch (error) {
+            console.log(error)
+            showToast('error', error.response.data?.message || 'Something went wrong')
+        }
     };
+
+
+
 
     useEffect(() => {
         if (lastElementRef.current) {
@@ -215,42 +239,46 @@ function CourseDetail() {
         });
     };
 
-    const handleCreateReviewSubmit = (e) => {
+    const handleCreateReviewSubmit = async (e) => {
         e.preventDefault();
 
         const formdata = new FormData();
-        formdata.append("course_id", course.course?.id);
+        formdata.append("course_id", course.course?.course_id);
         formdata.append("user_id", UserData()?.user_id);
         formdata.append("rating", createReview?.rating);
         formdata.append("review", createReview?.review);
-
-        useAxios.post(`student/rate-course/`, formdata).then((res) => {
+        try {
+            const res = await api.post(`student/rate-course/`, formdata)
             console.log(res.data);
             fetchCourseDetail();
-            Toast().fire({
-                icon: "success",
-                title: "Review created",
-            });
-        });
+            showToast('success', 'Review Created')
+        } catch (error) {
+            console.log(error)
+            showToast('error', error.response.data?.message || 'Something went wrong')
+
+        }
+
     };
 
-    const handleUpdateReviewSubmit = (e) => {
+    const handleUpdateReviewSubmit = async (e) => {
         e.preventDefault();
 
         const formdata = new FormData();
-        formdata.append("course", course.course?.id);
+        formdata.append("course", course.course?.course_id);
         formdata.append("user", UserData()?.user_id);
         formdata.append("rating", createReview?.rating || studentReview?.rating);
         formdata.append("review", createReview?.review || studentReview?.review);
-
-        useAxios.patch(`student/review-detail/${UserData()?.user_id}/${studentReview?.id}/`, formdata).then((res) => {
+        try {
+            const res = await api.patch(`student/review-detail/${UserData()?.user_id}/${studentReview?.id}/`, formdata)
             console.log(res.data);
             fetchCourseDetail();
-            Toast().fire({
-                icon: "success",
-                title: "Review updated",
-            });
-        });
+            showToast('success', 'Review Updated')
+        }
+        catch (error) {
+            console.log(error)
+            showToast('error', error.response.data?.message || 'Something went wrong')
+        }
+
     };
 
     return (
@@ -329,7 +357,7 @@ function CourseDetail() {
                                                                 </div>
                                                                 {/* Item */}
 
-                                                                {course?.curriculum?.map((c, index) => (
+                                                                {course?.curriculem?.map((c, index) => (
                                                                     <div className="accordion-item mb-3 p-3 bg-light">
                                                                         <h6 className="accordion-header font-base" id="heading-1">
                                                                             <button
@@ -342,8 +370,8 @@ function CourseDetail() {
                                                                             >
                                                                                 {c.title}
                                                                                 <span className="small ms-0 ms-sm-2">
-                                                                                    ({c.variant_items?.length} Lecture
-                                                                                    {c.variant_items?.length > 1 && "s"})
+                                                                                    ({c.variant_item?.length} Lecture
+                                                                                    {c.variant_item?.length > 1 && "s"})
                                                                                 </span>
                                                                             </button>
                                                                         </h6>
@@ -351,7 +379,7 @@ function CourseDetail() {
                                                                         <div id={`collapse-${c.variant_id}`} className="accordion-collapse collapse show" aria-labelledby="heading-1" data-bs-parent="#accordionExample2">
                                                                             <div className="accordion-body mt-3">
                                                                                 {/* Course lecture */}
-                                                                                {c.variant_items?.map((l, index) => (
+                                                                                {c.variant_item?.map((l, index) => (
                                                                                     <>
                                                                                         <div className="d-flex justify-content-between align-items-center">
                                                                                             <div className="position-relative d-flex align-items-center">
@@ -368,7 +396,7 @@ function CourseDetail() {
                                                                                                     name=""
                                                                                                     id=""
                                                                                                     onChange={() => handleMarkLessonAsCompleted(l.variant_item_id)}
-                                                                                                    checked={course.completed_lesson?.some((cl) => cl.variant_item.id === l.id)}
+                                                                                                    checked={course.completed_lessons?.some((cl) => cl.variant_item.variant_item_id === l.variant_item_id)}
                                                                                                 />
                                                                                             </div>
                                                                                         </div>
@@ -407,13 +435,13 @@ function CourseDetail() {
                                                                                                 <label htmlFor="exampleInputEmail1" className="form-label">
                                                                                                     Note Title
                                                                                                 </label>
-                                                                                                <input type="text" className="form-control" name="title" onChange={handleNoteChange} />
+                                                                                                <input type="text" className="form-control" name="title" value={createNote.title} onChange={handleNoteChange} />
                                                                                             </div>
                                                                                             <div className="mb-3">
                                                                                                 <label htmlFor="exampleInputPassword1" className="form-label">
                                                                                                     Note Content
                                                                                                 </label>
-                                                                                                <textarea className="form-control" id="" cols="30" rows="10" name="note" onChange={handleNoteChange}></textarea>
+                                                                                                <textarea className="form-control" id="" cols="30" rows="10" name="note" value={createNote.note} onChange={handleNoteChange}></textarea>
                                                                                             </div>
                                                                                             <button type="button" className="btn btn-secondary me-2" data-bs-dismiss="modal">
                                                                                                 <i className="fas fa-arrow-left"></i> Close
@@ -440,7 +468,7 @@ function CourseDetail() {
                                                                                     <a onClick={() => handleNoteShow(n)} className="btn btn-success mb-0">
                                                                                         <i className="bi bi-pencil-square me-2" /> Edit
                                                                                     </a>
-                                                                                    <a onClick={() => handleDeleteNote(n.id)} className="btn btn-danger mb-0">
+                                                                                    <a onClick={() => handleDeleteNote(n.note_id)} className="btn btn-danger mb-0">
                                                                                         <i className="bi bi-trash me-2" /> Delete
                                                                                     </a>
                                                                                 </div>
@@ -593,12 +621,15 @@ function CourseDetail() {
             </Modal>
 
             {/* Note Edit Modal */}
+
+
+
             <Modal show={noteShow} size="lg" onHide={handleNoteClose}>
                 <Modal.Header closeButton>
                     <Modal.Title>Note: {selectedNote?.title}</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                    <form onSubmit={(e) => handleSubmitEditNote(e, selectedNote?.id)}>
+                    <form onSubmit={(e) => handleSubmitEditNote(e, selectedNote?.note_id)}>
                         <div className="mb-3">
                             <label htmlFor="exampleInputEmail1" className="form-label">
                                 Note Title
@@ -615,7 +646,7 @@ function CourseDetail() {
                             <i className="fas fa-arrow-left"></i> Close
                         </button>
                         <button type="submit" className="btn btn-primary">
-                            Save Note <i className="fas fa-check-circle"></i>
+                            Update Note <i className="fas fa-check-circle"></i>
                         </button>
                     </form>
                 </Modal.Body>
@@ -630,7 +661,7 @@ function CourseDetail() {
                     <div className="border p-2 p-sm-4 rounded-3">
                         <ul className="list-unstyled mb-0" style={{ overflowY: "scroll", height: "500px" }}>
                             {selectedConversation?.messages?.map((m, index) => (
-                                <li className="comment-item mb-3">
+                                <li className="comment-item mb-3" key={index}>
                                     <div className="d-flex">
                                         <div className="ms-2">
                                             {/* Comment by */}
@@ -640,7 +671,7 @@ function CourseDetail() {
                                                         <h6 className="mb-1 lead fw-bold">
                                                             <a href="#!" className="text-decoration-none text-dark">
                                                                 {" "}
-                                                                {m.profile.full_name}{" "}
+                                                                {m.user}{" "}
                                                             </a>
                                                             <br />
                                                             <span style={{ fontSize: "12px", color: "gray" }}>{moment(m.date).format("DD MMM, YYYY")}</span>
@@ -658,7 +689,7 @@ function CourseDetail() {
                         </ul>
 
                         <form class="w-100 d-flex" onSubmit={sendNewMessage}>
-                            <textarea name="message" class="one form-control pe-4 bg-light w-75" id="autoheighttextarea" rows="2" onChange={handleMessageChange} placeholder="What's your question?"></textarea>
+                            <textarea name="message" class="one form-control pe-4 bg-light w-75" id="autoheighttextarea" rows="2" value={createMessage.message} onChange={handleMessageChange} placeholder="What's your question?"></textarea>
                             <button class="btn btn-primary ms-2 mb-0 w-25" type="submit">
                                 Post <i className="fas fa-paper-plane"></i>
                             </button>

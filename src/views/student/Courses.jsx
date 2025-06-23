@@ -6,8 +6,9 @@ import BaseHeader from "../partials/BaseHeader";
 import BaseFooter from "../partials/BaseFooter";
 import Sidebar from "./Partials/Sidebar";
 import Header from "./Partials/Header";
-import useAxios from "../../utils/useAxios";
 import UserData from "../plugin/UserData";
+import api from "../../utils/axios";
+
 
 function Courses() {
     const [courses, setCourses] = useState([]);
@@ -17,7 +18,7 @@ function Courses() {
     const fetchData = () => {
         setFetching(true);
 
-        useAxios.get(`student/course-list/${UserData()?.user_id}/`).then((res) => {
+        api.get(`student/course-list/${UserData()?.user_id}/`).then((res) => {
             console.log(res.data);
             setCourses(res.data);
             setFetching(false);
@@ -86,7 +87,7 @@ function Courses() {
                                             </thead>
                                             <tbody>
                                                 {courses?.map((c, index) => (
-                                                    <tr>
+                                                    <tr key={index}>
                                                         <td>
                                                             <div className="d-flex align-items-center">
                                                                 <div>
@@ -130,21 +131,21 @@ function Courses() {
                                                             <p className="mt-3">{c.lectures?.length}</p>
                                                         </td>
                                                         <td>
-                                                            <p className="mt-3">{c.completed_lesson?.length}</p>
+                                                            <p className="mt-3">{c.completed_lessons?.length || 0}</p>
                                                         </td>
                                                         <td>
-                                                            {c.completed_lesson?.length < 1 && (
-                                                                <button className="btn btn-success btn-sm mt-3">
+                                                            {c.completed_lessons?.length < 1 && (
+                                                                <Link to={`/student/courses/${c.enrollment_id}/`} className="btn btn-success btn-sm mt-3">
                                                                     start Course
                                                                     <i className="fas fa-arrow-right ms-2"></i>
-                                                                </button>
+                                                                </Link>
                                                             )}
 
-                                                            {c.completed_lesson?.length > 0 && (
-                                                                <button className="btn btn-primary btn-sm mt-3">
+                                                            {c.completed_lessons?.length > 0 && (
+                                                                <Link to={`/student/courses/${c.enrollment_id}/`} className="btn btn-success btn-sm mt-3">
                                                                     Continue Course
                                                                     <i className="fas fa-arrow-right ms-2"></i>
-                                                                </button>
+                                                                </Link>
                                                             )}
                                                         </td>
                                                     </tr>

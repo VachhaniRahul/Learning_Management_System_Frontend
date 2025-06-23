@@ -6,8 +6,8 @@ import BaseHeader from "../partials/BaseHeader";
 import BaseFooter from "../partials/BaseFooter";
 import Sidebar from "./Partials/Sidebar";
 import Header from "./Partials/Header";
-import useAxios from "../../utils/useAxios";
 import UserData from "../plugin/UserData";
+import api from "../../utils/axios";
 
 function Dashboard() {
     const [courses, setCourses] = useState([]);
@@ -16,12 +16,12 @@ function Dashboard() {
 
     const fetchData = () => {
         setFetching(true);
-        useAxios.get(`student/summary/${UserData()?.user_id}/`).then((res) => {
-            console.log(res.data[0]);
-            setStats(res.data[0]);
+        api.get(`student/summary/${UserData()?.user_id}/`).then((res) => {
+            console.log(res.data);
+            setStats(res.data);
         });
 
-        useAxios.get(`student/course-list/${UserData()?.user_id}/`).then((res) => {
+        api.get(`student/course-list/${UserData()?.user_id}/`).then((res) => {
             console.log(res.data);
             setCourses(res.data);
             setFetching(false);
@@ -99,7 +99,7 @@ function Dashboard() {
                                         </span>
                                         <div className="ms-4">
                                             <div className="d-flex">
-                                                <h5 className="purecounter mb-0 fw-bold"> {stats.achieved_certificates}</h5>
+                                                <h5 className="purecounter mb-0 fw-bold"> {stats.achived_certificate}</h5>
                                             </div>
                                             <p className="mb-0 h6 fw-light">Achieved Certificates</p>
                                         </div>
@@ -136,7 +136,7 @@ function Dashboard() {
                                             </thead>
                                             <tbody>
                                                 {courses?.map((c, index) => (
-                                                    <tr>
+                                                    <tr key={index}>
                                                         <td>
                                                             <div className="d-flex align-items-center">
                                                                 <div>
@@ -180,17 +180,17 @@ function Dashboard() {
                                                             <p className="mt-3">{c.lectures?.length}</p>
                                                         </td>
                                                         <td>
-                                                            <p className="mt-3">{c.completed_lesson?.length}</p>
+                                                            <p className="mt-3">{c.completed_lessons?.length}</p>
                                                         </td>
                                                         <td>
-                                                            {c.completed_lesson?.length < 1 && (
+                                                            {c.completed_lessons?.length < 1 && (
                                                                 <Link to={`/student/courses/${c.enrollment_id}/`} className="btn btn-success btn-sm mt-3">
                                                                     start Course
                                                                     <i className="fas fa-arrow-right ms-2"></i>
                                                                 </Link>
                                                             )}
 
-                                                            {c.completed_lesson?.length > 0 && (
+                                                            {c.completed_lessons?.length > 0 && (
                                                                 <Link to={`/student/courses/${c.enrollment_id}/`} className="btn btn-primary btn-sm mt-3">
                                                                     Continue Course
                                                                     <i className="fas fa-arrow-right ms-2"></i>
