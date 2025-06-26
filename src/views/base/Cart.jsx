@@ -12,6 +12,7 @@ import UserData from "../plugin/UserData";
 import useAxios from "../../utils/useAxios";
 import Swal from "sweetalert2";
 import { showToast } from "../../utils/toast";
+import Spinner from "../../utils/Spinner";
 
 function Cart() {
     const [cart, setCart] = useState([]);
@@ -22,15 +23,17 @@ function Cart() {
         email: "",
         country: "",
     });
-    const fetchCartItem = async () => {
-        try {
-            await apiInstance.get(`course/cart-list/${CartId()}/`).then((res) => {
-                setCart(res.data);
-            });
+    const [loading ,setLoading] = useState(false)
 
-            await apiInstance.get(`course/cart-details/${CartId()}/`).then((res) => {
-                setCartStats(res.data);
-            });
+    const fetchCartItem = async () => {
+        setLoading(true)
+        try {
+            const res = await apiInstance.get(`course/cart-list/${CartId()}/`)
+            setCart(res.data);
+
+            const res1 = await apiInstance.get(`course/cart-details/${CartId()}/`)
+            setCartStats(res1.data);
+            setLoading(false)
         } catch (error) {
             console.log(error);
             showToast('error', 'Something went wrong in cart module')
@@ -44,18 +47,18 @@ function Cart() {
     const navigate = useNavigate();
 
     const cartItemDelete = async (itemId) => {
-        await apiInstance.delete(`course/cart-item-delete/${CartId()}/${itemId}/`).then((res) => {
+        try {
+            await apiInstance.delete(`course/cart-item-delete/${CartId()}/${itemId}/`)
             fetchCartItem();
-            // Toast().fire({
-            //     icon: "success",
-            //     title: "Cart Item Deleted",
-            // });
             showToast('success', 'Cart Item Deleted')
-            // Set cart count after adding to cart
-            apiInstance.get(`course/cart-list/${CartId()}/`).then((res) => {
-                setCartCount(res.data?.length);
-            });
-        });
+            const res1 = await apiInstance.get(`course/cart-list/${CartId()}/`)
+            console.log(res1.data)
+            setCartCount(res1.data?.length)
+        } catch (error) {
+            console.log('error', error)
+            showToast('error', error.response?.data?.message || 'Something went wrong')
+        }
+
     };
 
     const handleBioDataChange = (event) => {
@@ -101,7 +104,7 @@ function Cart() {
     return (
         <>
             <BaseHeader />
-
+            {loading ? <Spinner /> : <>
             <section className="py-0">
                 <div className="container">
                     <div className="row">
@@ -255,6 +258,7 @@ function Cart() {
                     </form>
                 </div>
             </section>
+            </> }
             <br />
             <br />
             <BaseFooter />

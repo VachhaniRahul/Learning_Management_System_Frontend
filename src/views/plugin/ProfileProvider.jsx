@@ -7,6 +7,7 @@ import { showToast } from "../../utils/toast";
 
 export const ProfileProvider = ({ children }) => {
     const [profile, setProfile] = useState(null);
+    const [teacherProfile, setTeacherProfile] = useState(null)
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -32,8 +33,31 @@ export const ProfileProvider = ({ children }) => {
         fetchProfile();
     }, []);
 
+    useEffect(() => {
+        const fetchTeacherProfile = async () => {
+            const user_id = UserData()?.teacher_id;
+
+            if (!user_id) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                const res = await api.get(`teacher/details/${user_id}`);
+                setTeacherProfile(res.data);
+            } catch (err) {
+                console.error("Failed to load Teacher profile", err);
+                showToast('error', 'Profile not show error');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchTeacherProfile();
+    }, []);
+
     return (
-        <ProfileContext.Provider value={{ profile, setProfile, loading }}>
+        <ProfileContext.Provider value={{ profile, setProfile, loading, teacherProfile, setTeacherProfile }}>
             {children}
         </ProfileContext.Provider>
     );

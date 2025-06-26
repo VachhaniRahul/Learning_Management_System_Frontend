@@ -13,6 +13,7 @@ import Toast from "../plugin/Toast";
 import moment from "moment";
 import api from "../../utils/axios";
 import { showToast } from "../../utils/toast";
+import Spinner from "../../utils/Spinner";
 
 
 function CourseDetail() {
@@ -30,6 +31,7 @@ function CourseDetail() {
     const [selectedConversation, setSelectedConversation] = useState(null);
     const [createReview, setCreateReview] = useState({ rating: 1, review: "" });
     const [studentReview, setStudentReview] = useState([]);
+    const [loading, setLoading] = useState(false)
 
     const param = useParams();
     const lastElementRef = useRef();
@@ -60,14 +62,21 @@ function CourseDetail() {
     const handleQuestionShow = () => setAddQuestionShow(true);
 
     const fetchCourseDetail = async () => {
-        api.get(`student/course-details/${param.enrollment_id}/`).then((res) => {
+        setLoading(true)
+        try {
+            const res = await api.get(`student/course-details/${param.enrollment_id}/`)
             console.log(res.data)
             setCourse(res.data);
             setQuestions(res.data.question_answer);
             setStudentReview(res.data.review);
             const percentageCompleted = (res.data.completed_lessons?.length / res.data.lectures?.length) * 100;
             setCompletionPercentage(percentageCompleted?.toFixed(0));
-        });
+            setLoading(false)
+        } catch (error) {
+            console.log('error', error)
+            showToast('error', error.response?.data?.message || 'Something went wrong')
+        }
+        
     };
     useEffect(() => {
         fetchCourseDetail();
@@ -75,7 +84,7 @@ function CourseDetail() {
 
     console.log(createReview?.rating);
     // console.log(studentReview);
-    const handleMarkLessonAsCompleted = (variantItemId) => {
+    const handleMarkLessonAsCompleted = async(variantItemId) => {
         const key = `lecture_${variantItemId}`;
         setMarkAsCompletedStatus({
             ...markAsCompletedStatus,
@@ -86,14 +95,18 @@ function CourseDetail() {
         formdata.append("user_id", UserData()?.user_id || 0);
         formdata.append("course_id", course.course?.course_id);
         formdata.append("variant_item_id", variantItemId);
-
-        api.post(`student/course-completed/`, formdata).then((res) => {
+        try {
+            const res = await api.post(`student/course-completed/`, formdata)
             fetchCourseDetail();
             setMarkAsCompletedStatus({
                 ...markAsCompletedStatus,
                 [key]: "Updated",
             });
-        });
+
+        } catch (error) {
+            console.log('error', error)
+            showToast('error', error.response?.data?.message || 'Something went wrong')
+        }
     };
 
     const handleNoteChange = (event) => {
@@ -275,6 +288,7 @@ function CourseDetail() {
             showToast('success', 'Review Updated')
         }
         catch (error) {
+            console.log('Hello')
             console.log(error)
             showToast('error', error.response.data?.message || 'Something went wrong')
         }
@@ -284,7 +298,7 @@ function CourseDetail() {
     return (
         <>
             <BaseHeader />
-
+            {loading ? <Spinner /> :
             <section className="pt-5 pb-5">
                 <div className="container">
                     {/* Header Here */}
@@ -603,7 +617,7 @@ function CourseDetail() {
                         </div>
                     </div>
                 </div>
-            </section>
+            </section>}
 
             {/* Lecture Modal */}
             <Modal show={show} size="lg" onHide={handleClose}>

@@ -9,22 +9,33 @@ import BaseHeader from "../partials/BaseHeader";
 import BaseFooter from "../partials/BaseFooter";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import useAxios from "../../utils/useAxios";
 import UserData from "../plugin/UserData";
 import Swal from "sweetalert2";
-import Toast from "../plugin/Toast";
+import api from "../../utils/axios";
 
 function CourseEdit() {
     const [courseData, setCourseData] = useState({});
     const [imagePreview, setImagePreview] = useState("");
     const [category, setCategory] = useState([]);
+    const [loading, setLoading] = useState()
     const navigate = useNavigate();
     const param = useParams();
 
+    const teacherId = UserData()?.teacher_id
+
     useEffect(() => {
-        useAxios.get(`course/category/`).then((res) => {
-            setCategory(res.data);
-        });
+        const fetchCat = async () => {
+            setLoading(true)
+            try {
+                const res = await api.get(`course/category/`)
+                setCategory(res.data)
+                setLoading(false)
+            } catch (error) {
+                console.log('error', error)
+                showToast('error', error.response?.data?.message || 'Something went wrong')
+            }
+        }
+        fetchCat()
     }, []);
 
     const handleImageUpload = async (event) => {
@@ -37,7 +48,7 @@ function CourseEdit() {
             const formData = new FormData();
             formData.append("file", file);
 
-            const response = await useAxios.post("/file-upload/", formData, {
+            const response = await api.post("/file-upload/", formData, {
                 headers: {
                     "Content-Type": "multipart/form-data",
                 },
@@ -67,7 +78,7 @@ function CourseEdit() {
             const formData = new FormData();
             formData.append("file", file);
 
-            const response = await useAxios.post("/file-upload/", formData, {
+            const response = await api.post("/file-upload/", formData, {
                 headers: {
                     "Content-Type": "multipart/form-data",
                 },
@@ -106,7 +117,7 @@ function CourseEdit() {
             category: courseData?.category,
         };
 
-        const response = await useAxios.post(`teacher/course-create/`, json);
+        const response = await api.post(`teacher/course-create/`, json);
         console.log(response.data);
         navigate(`/instructor/edit-course/${response?.data?.course_id}/`);
         Swal.fire({
@@ -116,11 +127,11 @@ function CourseEdit() {
     };
 
     const fetchCourseDetail = () => {
-        useAxios.get(`course/category/`).then((res) => {
+        api.get(`course/category/`).then((res) => {
             setCategory(res.data);
         });
 
-        useAxios.get(`teacher/course-detail/${param.course_id}/`).then((res) => {
+        api.get(`teacher/course-detail/${param.course_id}/`).then((res) => {
             setCourseData(res.data);
             setImagePreview(res?.data?.image);
         });
@@ -218,6 +229,7 @@ function CourseEdit() {
                                                 <option value="French">French</option>
                                             </select>
                                         </div>
+
                                         <div className="mb-3">
                                             <label className="form-label">Course Description</label>
                                             <CKEditor

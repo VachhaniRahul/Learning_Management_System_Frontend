@@ -8,23 +8,34 @@ import BaseHeader from "../partials/BaseHeader";
 import BaseFooter from "../partials/BaseFooter";
 import { Link } from "react-router-dom";
 
-import useAxios from "../../utils/useAxios";
 import UserData from "../plugin/UserData";
+import api from "../../utils/axios";
+import { showToast } from "../../utils/toast";
+import Spinner from "../../utils/Spinner";
 
 function QA() {
     const [questions, setQuestions] = useState([]);
     const [selectedConversation, setSelectedConversation] = useState(null);
     const lastElementRef = useRef();
+    const [loading, setLoading] = useState(false)
     const [createMessage, setCreateMessage] = useState({
         title: "",
         message: "",
     });
 
+    const teacherId = UserData()?.teacher_id
+
     const fetchQuestions = async () => {
-        useAxios.get(`teacher/question-answer-list/${UserData()?.teacher_id}/`).then((res) => {
+        setLoading(true)
+        try {
+            const res = await api.get(`teacher/course-question-answer-list/${teacherId}/`)
             console.log(res.data);
             setQuestions(res.data);
-        });
+            setLoading(false)
+        } catch (error) {
+            console.log('error', error)
+            showToast('error', error.response?.data?.message || 'Something went wrong')
+        }
     };
 
     useEffect(() => {
@@ -44,18 +55,27 @@ function QA() {
             [event.target.name]: event.target.value,
         });
     };
-    console.log(selectedConversation.course);
+    console.log(selectedConversation?.course);
     const sendNewMessage = async (e) => {
         e.preventDefault();
         const formdata = new FormData();
-        formdata.append("course_id", selectedConversation.course);
         formdata.append("user_id", UserData()?.user_id);
         formdata.append("message", createMessage.message);
         formdata.append("qa_id", selectedConversation?.qa_id);
-
-        useAxios.post(`student/question-answer-message-create/`, formdata).then((res) => {
-            setSelectedConversation(res.data.question);
-        });
+        try {
+            const res = await api.post(`student/question-answer-message-create/?teacher_id=${UserData()?.teacher_id}`, formdata)
+            handleConversationClose()
+            setSelectedConversation(res.data.data.messages);
+            console.log(res.data.data.messages)
+            setCreateMessage(prev => ({
+                ...prev,
+                message: ''
+            }));
+            handleConversationShow(res.data.data)
+        } catch (error) {
+            console.log('error', error)
+            showToast('error', error.response?.data?.message || 'Something went wrong')
+        }
     };
 
     useEffect(() => {
@@ -78,7 +98,7 @@ function QA() {
     return (
         <>
             <BaseHeader />
-
+            {loading ? <Spinner /> :
             <section className="pt-5 pb-5">
                 <div className="container">
                     {/* Header Here */}
@@ -154,7 +174,7 @@ function QA() {
                         </div>
                     </div>
                 </div>
-            </section>
+            </section>}
 
             <Modal show={ConversationShow} size="lg" onHide={handleConversationClose}>
                 <Modal.Header closeButton>

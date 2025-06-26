@@ -13,6 +13,7 @@ import Toast from "../plugin/Toast";
 import { CartContext } from "../plugin/Context";
 import apiInstance from "../../utils/axios";
 import { showToast } from "../../utils/toast";
+import Spinner from "../../utils/Spinner";
 
 
 function CourseDetail() {
@@ -46,12 +47,14 @@ function CourseDetail() {
     };
 
     const fetchEnrollCourse = async () => {
-        try {
-            const res = await apiInstance.get(`user/enrollment-course-id/${userId}/`)
-            setEnrollCourse(res.data)
-        } catch (error) {
-            console.log(error)
-            showToast('error', error.response?.data?.message || 'Something went wrong')
+        if (userId) {
+            try {
+                const res = await apiInstance.get(`user/enrollment-course-id/${userId}/`)
+                setEnrollCourse(res.data)
+            } catch (error) {
+                console.log(error)
+                showToast('error', error.response?.data?.message || 'Something went wrong')
+            }
         }
     }
 
@@ -59,8 +62,6 @@ function CourseDetail() {
     useEffect(() => {
         fetchCourse();
         fetchEnrollCourse()
-
-
     }, []);
     useEffect(() => {
         if (course?.course_id && Array.isArray(enrollCourse) && enrollCourse.length > 0) {
@@ -117,9 +118,7 @@ function CourseDetail() {
 
             <>
                 {isLoading === true ? (
-                    <p>
-                        Loading <i className="fas fa-spinner fa-spin"></i>
-                    </p>
+                    <Spinner />
                 ) : (
                     <>
                         <section className="bg-light py-0 py-sm-5">

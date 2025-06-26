@@ -1,410 +1,419 @@
 import { useState, useEffect } from "react";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
-import Cookie from "js-cookie";
-
-import Sidebar from "./Partials/Sidebar";
-import Header from "./Partials/Header";
-import BaseHeader from "../partials/BaseHeader";
-import BaseFooter from "../partials/BaseFooter";
-import { Link, useParams } from "react-router-dom";
-
-import useAxios from "../../utils/useAxios";
-import UserData from "../plugin/UserData";
+import Sidebar from "../Partials/Sidebar";
+import BaseHeader from "../../partials/BaseHeader";
+import Header from "../Partials/Header";
+import BaseFooter from "../../partials/BaseFooter";
+import { useParams } from "react-router-dom";
+import UserData from "../../plugin/UserData";
 import Swal from "sweetalert2";
-import Toast from "../plugin/Toast";
+import api from "../../../utils/axios";
+import { showToast } from "../../../utils/toast";
+import Spinner from "../../../utils/Spinner";
 
 function CourseEdit() {
-    const [course, setCourse] = useState({ category: 0, file: "", image: "", title: "", description: "", price: "", level: "", language: "", teacher_course_status: "" });
+    const { course_id } = useParams();
+    const teacher_id = UserData()?.teacher_id;
 
-    const [category, setCategory] = useState([]);
-    const [progress, setProgress] = useState(0);
-    const [ckEdtitorData, setCKEditorData] = useState("");
+    const [categories, setCategories] = useState([]);
+    const [loading, setLoading] = useState()
 
-    const param = useParams();
-    const [variants, setVariants] = useState([
-        {
-            title: "",
-            items: [{ title: "", description: "", file: "", preview: false }],
-        },
-    ]);
-    // Update
+    const [basic, setBasic] = useState({
+        title: "", description: "", category: "", price: "", level: "", language: "", image: "", file: "", teacher_status: ''
+    });
+    const [editorData, setEditorData] = useState("");
+    const [variants, setVariants] = useState([]);
+
     const [imagePreview, setImagePreview] = useState("");
-    const [uploadProgress, setUploadProgress] = useState(0);
-    const [loading, setLoading] = useState(false);
+    const [loadingImage, setLoadingImage] = useState(false);
+    const [update, setUpdate] = useState(false)
+
+    const [editingVariantIndex, setEditingVariantIndex] = useState(null);
+    const [editingVariantTitle, setEditingVariantTitle] = useState("");
+    const [expandedVariantIndex, setExpandedVariantIndex] = useState(null);
+
+    const [editingItemIndex, setEditingItemIndex] = useState({ variant: null, item: null });
+    const [editingItemData, setEditingItemData] = useState({ title: "", description: "", file: null, preview: false });
 
     useEffect(() => {
-        const course_image_url = Cookie.get("course_image_url");
-        if (course_image_url) {
-            setCourse({
-                ...course,
-                image: course_image_url,
-            });
-            setImagePreview(course_image_url);
+        async function load() {
+            setLoading(true)
+            try {
+                const [{ data: catList }, { data: course }] = await Promise.all([
+                    api.get("/course/category/"),
+                    api.get(`/teacher/course-detail/${course_id}/`)
+                ]);
+                setCategories(catList);
+                setBasic({
+                    title: course.title,
+                    description: course.description,
+                    category: course.category.slug,
+                    price: course.price,
+                    level: course.level,
+                    language: course.language,
+                    image: "",
+                    file: "",
+                    teacher_status: course.teacher_status
+                });
+                setEditorData(course.description);
+                setVariants(course.curriculum.map(v => ({
+                    id: v.id,
+                    variant_id: v.variant_id,
+                    title: v.title,
+                    items: v.variant_item.map(i => ({
+                        id: i.id,
+                        variant_item_id: i.variant_item_id,
+                        title: i.title,
+                        description: i.description,
+                        file: null,
+                        preview: i.preview
+                    }))
+                })));
+                setImagePreview(course.image);
+                setLoading(false)
+            } catch (err) {
+                // Toast().fire({ icon: "error", title: "" });
+                showToast('error', 'Failed to load course data')
+            }
         }
-    }, []);
+        load();
+    }, [course_id]);
 
-    const fetchCourseDetail = () => {
-        useAxios.get(`course/category/`).then((res) => {
-            setCategory(res.data);
-        });
-
-        useAxios.get(`teacher/course-detail/${param.course_id}/`).then((res) => {
-            setCourse(res.data);
-            setVariants(res.data.curriculum);
-            setCKEditorData(res.data.description);
-        });
+    const handleEditor = (_, editor) => {
+        setEditorData(editor.getData());
+        setBasic(prev => ({ ...prev, description: editor.getData() }));
     };
 
-    useEffect(() => {
-        fetchCourseDetail();
-    }, []);
-    console.log(course);
-
-    const handleCourseInputChange = (event) => {
-        setCourse({
-            ...course,
-            [event.target.name]: event.target.type === "checkbox" ? event.target.checked : event.target.value,
-        });
+    const handleBasicChange = e => {
+        const { name, value } = e.target;
+        setBasic(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleCkEditorChange = (event, editor) => {
-        const data = editor.getData();
-        setCKEditorData(data);
-        console.log(ckEdtitorData);
-    };
-
-    const handleCourseImageChange = async (event) => {
-        const file = event.target.files[0];
-
+    const submitBasic = async () => {
+        setUpdate(true)
         try {
-            // const response = await uploadImage(file, (progressEvent) => {
-            //     const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            //     setUploadProgress(percentCompleted);
-            // });
-            const formData = new FormData();
-            formData.append("file", file);
-
-            const response = await useAxios.post("/file-upload/", formData, {
+            const form = new FormData();
+            Object.entries(basic).forEach(([k, v]) => {
+                if (v !== "" && v != null) {
+                    form.append(k, v);
+                }
+            });
+            await api.patch(`teacher/course-details-update/${teacher_id}/${course_id}/`, form, {
                 headers: {
                     "Content-Type": "multipart/form-data",
-                },
+                }
             });
-
-            if (response?.data?.url) {
-                Cookie.set("course_image_url", response?.data?.url);
-                setImagePreview(response?.data?.url);
-                console.log(response?.data?.url);
-                setLoading(false);
-                setCourse({
-                    ...course,
-                    image: response?.data?.url,
-                });
-            }
+            setUpdate(false)
+            Swal.fire({ icon: "success", title: "Course details updated" });
         } catch (error) {
-            console.error("Error uploading image:", error);
-        } finally {
-            setLoading(false);
+            showToast('error', 'Update failed')
         }
     };
 
-    const handleCourseIntroVideoChange = (event) => {
-        setCourse({
-            ...course,
-            [event.target.name]: event.target.files[0],
-        });
+    const handleImageChange = async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setImagePreview(reader.result);
+            setBasic(prev => ({ ...prev, image: file }));
+        };
+        reader.readAsDataURL(file);
     };
 
-    const handleVariantChange = (index, propertyName, value) => {
-        const updatedVariants = [...variants];
-        updatedVariants[index][propertyName] = value;
-        setVariants(updatedVariants);
+    const handleIntroVideo = e => {
+        setBasic(prev => ({ ...prev, file: e.target.files[0] || "" }));
 
-        console.log(`Name: ${propertyName} - value: ${value} - Index: ${index}`);
-        console.log(variants);
     };
 
-    const handleItemChange = (variantIndex, itemIndex, propertyName, value, type) => {
-        const updatedVariants = [...variants];
-        updatedVariants[variantIndex].items[itemIndex][propertyName] = value;
-        setVariants(updatedVariants);
-
-        console.log(`Name: ${propertyName} - value: ${value} - Index: ${variantIndex} ItemIndex: ${itemIndex} - type: ${type}`);
+    const handleEditVariant = (idx) => {
+        setEditingVariantIndex(idx);
+        setEditingVariantTitle(variants[idx].title);
     };
 
-    const addVariant = () => {
-        setVariants([
-            ...variants,
-            {
-                title: "",
-                items: [{ title: "", description: "", file: "", preview: false }],
-            },
-        ]);
-    };
-
-    const removeVariant = (index, variantId) => {
-        const updatedVariants = [...variants];
-        updatedVariants.splice(index, 1);
-        setVariants(updatedVariants);
-
-        useAxios.delete(`teacher/course/variant-delete/${variantId}/${UserData()?.teacher_id}/${param.course_id}/`).then((res) => {
-            console.log(res.data);
-            fetchCourseDetail();
-            Toast().fire({
-                icon: "success",
-                title: "Lecture deleted",
-            });
-        });
-    };
-
-    const addItem = (variantIndex) => {
-        const updatedVariants = [...variants];
-        updatedVariants[variantIndex].items.push({
-            title: "",
-            description: "",
-            file: "",
-            preview: false,
-        });
-
-        setVariants(updatedVariants);
-    };
-
-    const removeItem = (variantIndex, itemIndex, variantId, itemId) => {
-        const updatedVariants = [...variants];
-        updatedVariants[variantIndex].items.splice(itemIndex, 1);
-        setVariants(updatedVariants);
-
-        useAxios.delete(`teacher/course/variant-item-delete/${variantId}/${itemId}/${UserData()?.teacher_id}/${param.course_id}/`).then((res) => {
-            console.log(res.data);
-            fetchCourseDetail();
-            Toast().fire({
-                icon: "success",
-                title: "Lesson Item deleted",
-            });
-        });
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        const formdata = new FormData();
-        formdata.append("title", course.title);
-        formdata.append("description", ckEdtitorData);
-        formdata.append("category", course.category);
-        formdata.append("price", course.price);
-        formdata.append("level", course.level);
-        formdata.append("language", course.language);
-        formdata.append("teacher", parseInt(UserData()?.teacher_id));
-        console.log(course.category);
-
-        if (course.file !== null || course.file !== "") {
-            formdata.append("file", course.file || "");
+    const saveVariant = async (idx) => {
+        const v = variants[idx];
+        try {
+            await api.patch(`/teacher/course-variant-delete/${teacher_id}/${course_id}/${v.variant_id}/`, { title: editingVariantTitle });
+            setVariants(prev => prev.map((vv, i) => i === idx ? { ...vv, title: editingVariantTitle } : vv));
+            setEditingVariantIndex(null);
+            showToast('success', 'Section updated')
+        } catch {
+            showToast('error', 'Failed to update section')
         }
-
-        if (course.image.file) {
-            formdata.append("image", course.image.file);
-        }
-
-        variants.forEach((variant, variantIndex) => {
-            Object.entries(variant).forEach(([key, value]) => {
-                console.log(`Key: ${key} = value: ${value}`);
-                formdata.append(`variants[${variantIndex}][variant_${key}]`, String(value));
-            });
-
-            variant.items.forEach((item, itemIndex) => {
-                Object.entries(item).forEach(([itemKey, itemValue]) => {
-                    formdata.append(`variants[${variantIndex}][items][${itemIndex}][${itemKey}]`, itemValue);
-                });
-            });
-        });
-
-        const response = await useAxios.patch(`teacher/course-update/${UserData()?.teacher_id}/${param.course_id}/`, formdata);
-        Swal.fire({
-            icon: "success",
-            title: "Course Updated Successfully",
-        });
     };
+
+    const deleteVariant = async (idx) => {
+        const v = variants[idx];
+        try {
+            await api.delete(`teacher/course-variant-delete/${teacher_id}/${course_id}/${v.variant_id}/`);
+            setVariants(prev => prev.filter((_, i) => i !== idx));
+            showToast('success', 'Section deleted')
+        } catch {
+            showToast('error', 'Failed to delete section')
+        }
+    };
+
+    const addVariant = async () => {
+        try {
+            const { data } = await api.post(`teacher/course-variant-create/${teacher_id}/${course_id}/`, { title: "New Section" });
+            console.log('DATA', data)
+            setVariants(prev => [...prev, { ...data, items: [] }]);
+            showToast('success', 'Section added')
+        } catch {
+            showToast('error', 'Failed to add section')
+        }
+    };
+
+    const toggleExpand = (idx) => {
+        setExpandedVariantIndex(prev => prev === idx ? null : idx);
+    };
+
+    const handleEditItem = (vidx, iidx) => {
+        const item = variants[vidx].items[iidx];
+        setEditingItemIndex({ variant: vidx, item: iidx });
+        setEditingItemData({ ...item });
+    };
+
+    const saveItem = async (vidx, iidx) => {
+        const { title, description, file, preview } = editingItemData;
+        const variant_item_id = variants[vidx].items[iidx].variant_item_id;
+        try {
+            const form = new FormData();
+            form.append("title", title);
+            form.append("description", description);
+            form.append("preview", preview);
+            if (file) form.append("file", file);
+            await api.patch(`/teacher/course-variant-item-delete/${teacher_id}/${course_id}/${variant_item_id}/`, form, {
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                }
+            });
+            setVariants(prev => prev.map((v, vi) =>
+                vi === vidx
+                    ? {
+                        ...v,
+                        items: v.items.map((it, ii) =>
+                            ii === iidx ? { ...it, title, description, preview } : it
+                        )
+                    }
+                    : v
+            ));
+            setEditingItemIndex({ variant: null, item: null });
+            showToast('success', 'Lecture Updated')
+
+        } catch {
+            showToast('error', 'Failed to update lesson')
+        }
+    };
+
+    const deleteItem = async (vidx, iidx) => {
+        const variant_item_id = variants[vidx].items[iidx].variant_item_id;
+        try {
+            await api.delete(`/teacher/course-variant-item-delete/${teacher_id}/${course_id}/${variant_item_id}/`);
+            setVariants(prev => prev.map((v, i) =>
+                i === vidx ? { ...v, items: v.items.filter((_, j) => j !== iidx) } : v
+            ));
+            showToast('success', 'Lecture Deleted')
+        } catch {
+            showToast('error', 'Failed to delete lecture')
+        }
+    };
+
+    const addItem = async (vidx) => {
+        const v = variants[vidx];
+        try {
+            const { data } = await api.post(`/teacher/course-variant-item-create/${teacher_id}/${course_id}/${v.variant_id}/`, { title: "New Lesson" });
+            setVariants(prev => prev.map((vv, i) => i === vidx ? { ...vv, items: [...vv.items, data] } : vv));
+            showToast('success', 'Lecture Added')
+
+        } catch {
+            showToast('error', 'Failed to add Lecture')
+
+        }
+    };
+
     return (
         <>
             <BaseHeader />
+            {loading ? <Spinner /> :
+                <section className="pt-5 pb-5 bg-light">
+                    <div className="container">
+                        <Header />
+                        <div className="row mt-4">
+                            <Sidebar />
+                            <div className="col-lg-9 col-md-8 col-12">
 
-            <section className="pt-5 pb-5">
-                <div className="container">
-                    {/* Header Here */}
-                    <Header />
-                    <div className="row mt-0 mt-md-4">
-                        {/* Sidebar Here */}
-                        <Sidebar />
-                        <form className="col-lg-9 col-md-8 col-12" onSubmit={handleSubmit}>
-                            <>
-                                <section className="py-4 py-lg-6 bg-primary rounded-3">
-                                    <div className="container">
-                                        <div className="row">
-                                            <div className="offset-lg-1 col-lg-10 col-md-12 col-12">
-                                                <div className="d-lg-flex align-items-center justify-content-between">
-                                                    {/* Content */}
-                                                    <div className="mb-4 mb-lg-0">
-                                                        <h1 className="text-white mb-1">Add New Course</h1>
-                                                        <p className="mb-0 text-white lead">Just fill the form and create your courses.</p>
-                                                    </div>
-                                                    <div>
-                                                        <Link to="/instructor/courses/" className="btn" style={{ backgroundColor: "white" }}>
-                                                            {" "}
-                                                            <i className="fas fa-arrow-left"></i> Back to Course
-                                                        </Link>
-                                                        <a href="instructor-courses.html" className="btn btn-dark ms-2">
-                                                            Save <i className="fas fa-check-circle"></i>
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
+                                {/* Basic Course Details */}
+                                <div className="card shadow-sm mb-4">
+                                    <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                        <h5 className="mb-0">📝 Basic Course Details</h5>
                                     </div>
-                                </section>
-                                <section className="pb-8 mt-5">
-                                    <div className="card mb-3">
-                                        {/* Basic Info Section */}
-                                        <div className="card-header border-bottom px-4 py-3">
-                                            <h4 className="mb-0">Basic Information</h4>
+                                    <div className="card-body">
+                                        {/* Image Preview */}
+                                        {imagePreview && (
+                                            <div className="mb-3 text-center">
+                                                <img src={imagePreview} alt="Preview" className="rounded shadow-sm" style={{ maxHeight: "200px" }} />
+                                            </div>
+                                        )}
+
+                                        {/* Image and Video Upload */}
+                                        <div className="row g-3 mb-3">
+                                            <div className="col-md-6">
+                                                <label className="form-label">Course Image</label>
+                                                <input type="file" name="image" className="form-control" onChange={handleImageChange} disabled={loadingImage} />
+                                            </div>
+                                            <div className="col-md-6">
+                                                <label className="form-label">Intro Video</label>
+                                                <input type="file" name="file" className="form-control" onChange={handleIntroVideo} />
+                                            </div>
                                         </div>
-                                        <div className="card-body">
-                                            <label htmlFor="courseTHumbnail" className="form-label">
-                                                Thumbnail Preview
-                                            </label>
-                                            <img
-                                                style={{
-                                                    width: "100%",
-                                                    height: "330px",
-                                                    objectFit: "cover",
-                                                    borderRadius: "10px",
-                                                }}
-                                                className="mb-4"
-                                                src={imagePreview || "https://www.eclosio.ong/wp-content/uploads/2018/08/default.png"}
-                                                alt=""
-                                            />
-                                            <div className="mb-3">
-                                                <label htmlFor="courseTHumbnail" className="form-label">
-                                                    Course Thumbnail
-                                                </label>
-                                                <input id="courseTHumbnail" className="form-control" type="file" name="image" onChange={handleCourseImageChange} />
+
+                                        {/* Basic Info */}
+                                        <div className="row g-3 mb-3">
+                                            <div className="col-md-6">
+                                                <label className="form-label">Title</label>
+                                                <input type="text" name="title" value={basic.title} onChange={handleBasicChange} className="form-control" placeholder="Course Title" />
                                             </div>
-                                            <div className="mb-3">
-                                                <label htmlFor="courseTitle" className="form-label">
-                                                    Intro Video
-                                                </label>
-                                                <input id="introvideo" className="form-control" type="file" name="file" onChange={handleCourseIntroVideoChange} />
+                                            <div className="col-md-6">
+                                                <label className="form-label">Price (₹)</label>
+                                                <input type="number" name="price" value={basic.price} onChange={handleBasicChange} className="form-control" placeholder="e.g. 999" />
                                             </div>
-                                            <div className="mb-3">
-                                                <label htmlFor="courseTitle" className="form-label">
-                                                    Title
-                                                </label>
-                                                <input id="courseTitle" className="form-control" type="text" placeholder="" name="title" defaultValue={course.title} onChange={handleCourseInputChange} />
-                                                <small>Write a 60 character course title.</small>
-                                            </div>
-                                            <div className="mb-3">
-                                                <label className="form-label">Courses category</label>
-                                                <select className="form-select" name="category" onChange={handleCourseInputChange} value={course.category.id}>
-                                                    <option value="">-------------</option>
-                                                    {category?.map((c, index) => (
-                                                        <option key={index} value={c.id}>
-                                                            {c.title}
-                                                        </option>
+                                            <div className="col-md-4">
+                                                <label className="form-label">Category</label>
+                                                <select name="category" value={basic.category} onChange={handleBasicChange} className="form-select">
+                                                    <option value="">Choose...</option>
+                                                    {categories.map(c => (
+                                                        <option key={c.id} value={c.slug}>{c.title}</option>
                                                     ))}
                                                 </select>
-                                                <small>Help people find your courses by choosing categories that represent your course.</small>
                                             </div>
-                                            <div className="mb-3">
-                                                <select className="form-select" onChange={handleCourseInputChange} name="level" value={course.level}>
-                                                    <option value="">Select level</option>
-                                                    <option value="Beginner">Beginner</option>
-                                                    <option value="Intemediate">Intemediate</option>
-                                                    <option value="Advanced">Advanced</option>
+                                            <div className="col-md-4">
+                                                <label className="form-label">Level</label>
+                                                <select name="level" value={basic.level} onChange={handleBasicChange} className="form-select">
+                                                    <option value="">Choose...</option>
+                                                    <option>Beginner</option>
+                                                    <option>Intermediate</option>
+                                                    <option>Advanced</option>
                                                 </select>
                                             </div>
-
-                                            <div className="mb-3">
-                                                <select className="form-select" onChange={handleCourseInputChange} name="language" value={course.language}>
-                                                    <option value="">Select Language</option>
-                                                    <option value="English">English</option>
-                                                    <option value="Spanish">Spanish</option>
-                                                    <option value="French">French</option>
+                                            <div className="col-md-4">
+                                                <label className="form-label">Language</label>
+                                                <select name="language" value={basic.language} onChange={handleBasicChange} className="form-select">
+                                                    <option value="">Choose...</option>
+                                                    <option>English</option>
+                                                    <option>Spanish</option>
+                                                    <option>Hindi</option>
                                                 </select>
                                             </div>
-                                            <div className="mb-3">
-                                                <label className="form-label">Course Description</label>
-                                                <CKEditor editor={ClassicEditor} data={ckEdtitorData} onChange={handleCkEditorChange} style={{ height: "400px" }} name="description" value={course.description || ""} />
-                                                <small>A brief summary of your courses.</small>
-                                            </div>
-                                            <label htmlFor="courseTitle" className="form-label">
-                                                Price
-                                            </label>
-                                            <input id="courseTitle" className="form-control" type="number" onChange={handleCourseInputChange} name="price" placeholder="$20.99" />
                                         </div>
 
-                                        {/* Curriculum Section */}
-                                        <div className="card-header border-bottom px-4 py-3">
-                                            <h4 className="mb-0">Curriculum</h4>
+                                        {/* Status and Description */}
+                                        <div className="mb-3">
+                                            <label className="form-label">Teacher Status</label>
+                                            <select name="teacher_status" value={basic.teacher_status} onChange={handleBasicChange} className="form-select">
+                                                <option value="">Choose...</option>
+                                                <option>Draft</option>
+                                                <option>Disable</option>
+                                                <option>Published</option>
+                                            </select>
                                         </div>
-                                        <div className="card-body ">
-                                            {variants?.map((variant, variantIndex) => (
-                                                <div className="border p-2 rounded-3 mb-3" style={{ backgroundColor: "#ededed" }}>
-                                                    <div className="d-flex mb-4">
-                                                        <input type="text" placeholder="Section Name" required value={variant.title} className="form-control" onChange={(e) => handleVariantChange(variantIndex, "title", e.target.value)} />
-                                                        <button className="btn btn-danger ms-2" type="button" onClick={() => removeVariant(variantIndex, variant.id)}>
-                                                            <i className="fas fa-trash"></i>
-                                                        </button>
-                                                    </div>
-                                                    {variant?.items?.map((item, itemIndex) => (
-                                                        <div className=" mb-2 mt-2 shadow p-2 rounded-3 " style={{ border: "1px #bdbdbd solid" }}>
-                                                            <input type="text" placeholder="Lesson Title" className="form-control me-1 mt-2" name="title" value={item.title} onChange={(e) => handleItemChange(variantIndex, itemIndex, "title", e.target.value, e.target.type)} />
-                                                            <textarea
-                                                                name="description"
-                                                                id=""
-                                                                value={item.description}
-                                                                cols="30"
-                                                                className="form-control mt-2"
-                                                                placeholder="Lesson Description"
-                                                                rows="4"
-                                                                onChange={(e) => handleItemChange(variantIndex, itemIndex, "description", e.target.value, e.target.type)}
-                                                            ></textarea>
-                                                            <div className="row d-flex align-items-center">
-                                                                <div className="col-lg-8">
-                                                                    <input type="file" placeholder="Item Price" className="form-control me-1 mt-2" name="file" onChange={(e) => handleItemChange(variantIndex, itemIndex, "file", e.target.files[0], e.target.type)} />
-                                                                </div>
-                                                                <div className="col-lg-4">
-                                                                    <label htmlFor={`checkbox${1}`}>Preview</label>
-                                                                    <input type="checkbox" className="form-check-input ms-2" name="" checked={item.preview} id={`checkbox${1}`} onChange={(e) => handleItemChange(variantIndex, itemIndex, "preview", e.target.checked, e.target.type)} />
-                                                                </div>
-                                                            </div>
-                                                            <button className="btn btn-sm btn-outline-danger me-2 mt-2" type="button" onClick={() => removeItem(variantIndex, itemIndex, variant.variant_id, item.variant_item_id)}>
-                                                                Delete Lesson <i className="fas fa-trash"></i>
-                                                            </button>
+
+                                        <div className="mb-3">
+                                            <label className="form-label">Description</label>
+                                            <CKEditor editor={ClassicEditor} data={editorData} onChange={handleEditor} />
+                                        </div>
+
+                                        <div className="text-end">
+                                            {update ? <button disabled="true" className="btn btn-success px-4">
+                                                💾 Updating Details ...
+                                            </button> :
+                                            <button onClick={submitBasic} className="btn btn-success px-4">
+                                                💾 Update Details
+                                            </button>}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Course Sections (Variants) */}
+                                <div className="card shadow-sm mb-4">
+                                    <div className="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                                        <h5 className="mb-0">📚 Course Sections</h5>
+                                        <button className="btn btn-sm btn-light" onClick={addVariant}>+ Add Section</button>
+                                    </div>
+                                    <div className="card-body">
+                                        {variants.map((v, idx) => (
+                                            <div className="card mb-3 shadow-sm" key={idx}>
+                                                <div className="card-body">
+                                                    {editingVariantIndex === idx ? (
+                                                        <div className="d-flex gap-2 mb-2">
+                                                            <input value={editingVariantTitle} onChange={e => setEditingVariantTitle(e.target.value)} className="form-control" />
+                                                            <button className="btn btn-success btn-sm" onClick={() => saveVariant(idx)}>Save</button>
+                                                            <button className="btn btn-secondary btn-sm" onClick={() => setEditingVariantIndex(null)}>Cancel</button>
                                                         </div>
-                                                    ))}
+                                                    ) : (
+                                                        <div className="d-flex justify-content-between align-items-center">
+                                                            <h6>{v.title}</h6>
+                                                            <div>
+                                                                <button className="btn btn-sm btn-outline-primary me-2" onClick={() => handleEditVariant(idx)}>Edit</button>
+                                                                <button className="btn btn-sm btn-outline-danger me-2" onClick={() => deleteVariant(idx)}>Delete</button>
+                                                                <button className="btn btn-sm btn-outline-dark" onClick={() => toggleExpand(idx)}>
+                                                                    {expandedVariantIndex === idx ? "Hide Lessons" : "Show Lessons"}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
 
-                                                    <button className="btn btn-sm btn-primary mt-2" type="button" onClick={() => addItem(variantIndex)}>
-                                                        + Add Lesson
-                                                    </button>
+                                                    {expandedVariantIndex === idx && (
+                                                        <div className="mt-3">
+                                                            {v.items.map((it, iidx) => (
+                                                                <div key={iidx} className="border rounded p-3 mb-2 bg-light">
+                                                                    {editingItemIndex.variant === idx && editingItemIndex.item === iidx ? (
+                                                                        <>
+                                                                            <input value={editingItemData.title} onChange={e => setEditingItemData(d => ({ ...d, title: e.target.value }))} className="form-control mb-1" placeholder="Lecture Title" />
+                                                                            <textarea value={editingItemData.description} onChange={e => setEditingItemData(d => ({ ...d, description: e.target.value }))} className="form-control mb-1" placeholder="Lecture Description" />
+                                                                            <input type="file" onChange={e => setEditingItemData(d => ({ ...d, file: e.target.files[0] }))} className="form-control mb-1" />
+                                                                            <div className="form-check">
+                                                                                <input type="checkbox" className="form-check-input" id={`preview-${idx}-${iidx}`} checked={editingItemData.preview} onChange={e => setEditingItemData(d => ({ ...d, preview: e.target.checked }))} />
+                                                                                <label className="form-check-label" htmlFor={`preview-${idx}-${iidx}`}>Preview</label>
+                                                                            </div>
+                                                                            <div className="mt-2 d-flex gap-2">
+                                                                                <button className="btn btn-success btn-sm" onClick={() => saveItem(idx, iidx)}>Save</button>
+                                                                                <button className="btn btn-secondary btn-sm" onClick={() => setEditingItemIndex({ variant: null, item: null })}>Cancel</button>
+                                                                            </div>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <h6 className="mb-1">{it.title}</h6>
+                                                                            <p className="mb-1">{it.description}</p>
+                                                                            <p className="mb-1">Preview: <span className="badge bg-info text-dark">{it.preview ? "Yes" : "No"}</span></p>
+                                                                            <div className="d-flex gap-2">
+                                                                                <button className="btn btn-outline-primary btn-sm" onClick={() => handleEditItem(idx, iidx)}>Edit</button>
+                                                                                <button className="btn btn-outline-danger btn-sm" onClick={() => deleteItem(idx, iidx)}>Delete</button>
+                                                                            </div>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                            <button className="btn btn-sm btn-secondary mt-2" onClick={() => addItem(idx)}>+ Add Lecture</button>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            ))}
-
-                                            <button className="btn btn-sm btn-secondary w-100 mt-2" type="button" onClick={addVariant}>
-                                                + New Section
-                                            </button>
-                                        </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                    <button className="btn btn-lg btn-success w-100 mt-2" type="submit">
-                                        Create Course <i className="fas fa-check-circle"></i>
-                                    </button>
-                                </section>
-                            </>
-                        </form>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </section>
-
+                </section>
+            }
             <BaseFooter />
+
         </>
     );
 }
 
 export default CourseEdit;
+

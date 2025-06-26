@@ -5,18 +5,21 @@ import BaseHeader from "../partials/BaseHeader";
 import BaseFooter from "../partials/BaseFooter";
 import apiInstance from "../../utils/axios";
 import { showToast } from "../../utils/toast";
+import Spinner from "../../utils/Spinner";
 
 function Checkout() {
     const [order, setOrder] = useState([]);
     const [coupon, setCoupon] = useState("");
     const [paymentLoading, setPaymentLoading] = useState(false);
+    const [loading ,setLoading] = useState(false)
 
     const param = useParams();
     const fetchOrder = async () => {
+        setLoading(true)
         try {
-            apiInstance.get(`order/checkout/${param.order_oid}/`).then((res) => {
-                setOrder(res.data);
-            });
+            const res = await apiInstance.get(`order/checkout/${param.order_oid}/`)
+            setOrder(res.data);
+            setLoading(false)           
         } catch (error) {
             console.log(error);
             showToast('error', 'Something went wrong in payment')
@@ -48,15 +51,11 @@ function Checkout() {
         console.log(coupon)
 
         try {
-            await apiInstance.post(`order/coupon/`, formdata).then((res) => {
+
+            const res = await apiInstance.post(`order/coupon/`, formdata)
                 console.log(res.data);
                 fetchOrder();
-                // Toast().fire({
-                //     icon: res.data.icon,
-                //     title: res.data.message,
-                // });
                 showToast('success', res.data.message)
-            });
         } catch (error) {
             console.log(error)
 
@@ -79,7 +78,7 @@ function Checkout() {
     return (
         <>
             <BaseHeader />
-
+            {loading ? <Spinner /> : <>
             <section className="py-0">
                 <div className="container">
                     <div className="row">
@@ -270,7 +269,7 @@ function Checkout() {
                         </div>
                     </div>
                 </div>
-            </section>
+            </section> </>}
 
             <BaseFooter />
         </>

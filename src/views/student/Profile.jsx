@@ -8,6 +8,7 @@ import UserData from "../plugin/UserData";
 import { ProfileContext } from "../plugin/Context";
 import { showToast } from "../../utils/toast";
 import api from "../../utils/axios";
+import Spinner from "../../utils/Spinner";
 
 function Profile() {
     const {profile, setProfile} = useContext(ProfileContext);
@@ -18,14 +19,17 @@ function Profile() {
         country: "",
     });
     const [imagePreview, setImagePreview] = useState("");
+    const [loading, setLoading] = useState(false)
 
     const fetchProfile = async () => {
+        setLoading(true)
         try {
             const res = await api.get(`user/profile/${UserData()?.user_id}/`)
             console.log(res.data);
             setProfile(res.data);
             setProfileData(res.data);
             setImagePreview(res.data.image);
+            setLoading(false)
 
         } catch (error) {
             console.log('Error in profile', error)
@@ -124,7 +128,7 @@ function Profile() {
     return (
         <>
             <BaseHeader />
-
+            {loading ? <Spinner /> : 
             <section className="pt-5 pb-5">
                 <div className="container">
                     {/* Header Here */}
@@ -207,7 +211,7 @@ function Profile() {
                         </div>
                     </div>
                 </div>
-            </section>
+                </section>}
 
             <BaseFooter />
         </>

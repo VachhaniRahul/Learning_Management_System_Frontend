@@ -8,45 +8,79 @@ import Header from "./Partials/Header";
 import BaseHeader from "../partials/BaseHeader";
 import BaseFooter from "../partials/BaseFooter";
 
-import useAxios from "../../utils/useAxios";
 import UserData from "../plugin/UserData";
-import { teacherId } from "../../utils/constants";
 import Toast from "../plugin/Toast";
+import api from "../../utils/axios";
+import { showToast } from "../../utils/toast";
+import Spinner from "../../utils/Spinner";
 
 function Review() {
     const [reviews, setReviews] = useState([]);
     const [reply, setReply] = useState("");
+    const [loading, setLoading] = useState(false)
     const [filteredReviews, setFilteredReview] = useState([]);
+    const [filters, setFilters] = useState({
+        rating: 0,
+        courseQuery: "",
+        sortBy: "",
+    });
 
-    const fetchReviewsData = () => {
-        useAxios.get(`teacher/review-lists/${teacherId}/`).then((res) => {
+    const teacherId = UserData()?.teacher_id
+
+    const fetchReviewsData = async () => {
+        setLoading(true)
+        try {
+            const res = await api.get(`/teacher/review-list/${teacherId}/`)
             console.log(res.data);
             setReviews(res.data);
-            setFilteredReview(res.data);
-        });
+            const filtered = applyFilter(res.data, filters);
+            setFilteredReview(filtered);
+            setLoading(false)
+        } catch (error) {
+            console.log('error', error)
+            showToast('error', error.response?.data?.message || 'Something went wrong')
+        }
     };
 
     useEffect(() => {
         fetchReviewsData();
     }, []);
 
+    const applyFilter = (data, filterOptions) => {
+        let result = [...data];
+
+        if (filterOptions.rating !== 0) {
+            result = result.filter((r) => r.rating === filterOptions.rating);
+        }
+
+        if (filterOptions.courseQuery) {
+            result = result.filter((r) =>
+                r.course.title.toLowerCase().includes(filterOptions.courseQuery.toLowerCase())
+            );
+        }
+
+        if (filterOptions.sortBy === "Newest") {
+            result.sort((a, b) => new Date(b.date) - new Date(a.date));
+        } else if (filterOptions.sortBy === "Oldest") {
+            result.sort((a, b) => new Date(a.date) - new Date(b.date));
+        }
+
+        return result;
+    };
+
     const handleSubmitReply = async (reviewId) => {
         try {
-            await useAxios
-                .patch(`teacher/review-detail/${teacherId}/${reviewId}/`, {
-                    reply: reply,
-                })
-                .then((res) => {
-                    console.log(res.data);
-                    fetchReviewsData();
-                    Toast().fire({
-                        icon: "success",
-                        title: "Reply sent.",
-                    });
-                    setReply("");
-                });
+            const res = await api.patch(`teacher/review-detail/${teacherId}/${reviewId}/`, {
+                reply: reply,
+            })
+            console.log(res.data);
+            fetchReviewsData();
+            setReply("");
+            showToast('success', 'Reply Sent')
+
         } catch (error) {
             console.log(error);
+            showToast('error', error.response?.data?.message || 'Something went wrong')
         }
     };
 
@@ -54,8 +88,10 @@ function Review() {
         const sortValue = e.target.value;
         let sortedReview = [...filteredReviews];
         if (sortValue === "Newest") {
+            setFilters((prev) => ({ ...prev, sortBy: 'Newest' }))
             sortedReview.sort((a, b) => new Date(b.date) - new Date(a.date));
         } else {
+            setFilters((prev) => ({ ...prev, sortBy: 'Oldest' }))
             sortedReview.sort((a, b) => new Date(a.date) - new Date(b.date));
         }
 
@@ -66,29 +102,33 @@ function Review() {
         const rating = parseInt(e.target.value);
         console.log(rating);
         if (rating === 0) {
+            setFilters((prev) => ({ ...prev, rating: 0 }))
             fetchReviewsData();
         } else {
-            const filtered = reviews.filter((review) => review.rating === rating);
+            const filtered = filteredReviews.filter((review) => review.rating === rating);
             setFilteredReview(filtered);
+            setFilters((prev) => ({ ...prev, rating: rating }))
         }
     };
 
     const handleFilterByCourse = (e) => {
         const query = e.target.value.toLowerCase();
         if (query === "") {
+            setFilters((prev) => ({ ...prev, courseQuery: "" }))
             fetchReviewsData();
         } else {
-            const filtered = reviews.filter((review) => {
+            const filtered = filteredReviews.filter((review) => {
                 return review.course.title.toLowerCase().includes(query);
             });
             setFilteredReview(filtered);
+            setFilters((prev) => ({ ...prev, courseQuery: query }))
         }
     };
 
     return (
         <>
             <BaseHeader />
-
+            {loading ? <Spinner /> :
             <section className="pt-5 pb-5">
                 <div className="container">
                     {/* Header Here */}
@@ -214,7 +254,7 @@ function Review() {
                         </div>
                     </div>
                 </div>
-            </section>
+            </section>}
 
             <BaseFooter />
         </>

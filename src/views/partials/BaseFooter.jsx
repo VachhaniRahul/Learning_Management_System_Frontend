@@ -8,9 +8,9 @@ function BaseFooter() {
                     <div className="col-lg-4 col-md-6 col-12 text-white">
                         {/* about company */}
                         <div className="mb-4">
-                            <h1>Desphixs</h1>
+                            <h1>LMS</h1>
                             <div className="mt-4">
-                                <p>Desphixs is feature-rich components and beautifully Bootstrap UIKit for developers, built with bootstrap responsive framework.</p>
+                                <p>LMS is feature-rich components and beautifully Bootstrap UIKit for developers, built with bootstrap responsive framework.</p>
                                 {/* social media */}
                                 <div className="fs-4 mt-4">
                                     {/*Facebook*/}
@@ -110,21 +110,14 @@ function BaseFooter() {
                                 Email:
                                 <a href="#" className="text-white">
                                     {" "}
-                                    support@desphixs.com
+                                    lms@gmail.com
                                 </a>
                             </p>
                             <p>
                                 Phone:
-                                <span className="text-dark fw-semibold">(000) 123 456 789</span>
+                                <span className="text-white fw-semibold"> (000) 123 456 789</span>
                             </p>
-                            <div className="d-flex">
-                                <a href="#">
-                                    <img src="../../assets/images/svg/appstore.svg" alt="" className="img-fluid" />
-                                </a>
-                                <a href="#" className="ms-2">
-                                    <img src="../../assets/images/svg/playstore.svg" alt="" className="img-fluid" />
-                                </a>
-                            </div>
+                           
                         </div>
                     </div>
                 </div>
@@ -135,7 +128,7 @@ function BaseFooter() {
                             <div className="me-4">
                                 <span>
                                     ©<span id="copyright5"></span>
-                                    Desphixs
+                                    Rahul
                                 </span>
                             </div>
                             <div>

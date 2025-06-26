@@ -15,16 +15,20 @@ import GetCurrentAddress from "../plugin/UserCountry";
 import { CartContext } from "../plugin/Context";
 import api from "../../utils/axios";
 import { showToast } from "../../utils/toast";
+import Spinner from "../../utils/Spinner";
 
 function Wishlist() {
     const [wishlist, setWishlist] = useState([]);
     const [cartCount, setCartCount] = useContext(CartContext);
+    const [loading, setLoading] = useState(false)
 
     const fetchWishlist = async() => {
+        setLoading(true)
         try {
             const res = await api.get(`student/wishlist/${UserData()?.user_id}/`)
             console.log(res.data);
             setWishlist(res.data);
+            setLoading(false)
         } catch (error) {
             console.log('Error in wishlist', error)
             showToast('error', 'Something went wrong in wishlist')
@@ -77,7 +81,7 @@ function Wishlist() {
     return (
         <>
             <BaseHeader />
-
+            {loading ? <Spinner /> :
             <section className="pt-5 pb-5">
                 <div className="container">
                     {/* Header Here */}
@@ -169,7 +173,7 @@ function Wishlist() {
                         </div>
                     </div>
                 </div>
-            </section>
+            </section>}
 
             <BaseFooter />
         </>

@@ -9,45 +9,53 @@ import Header from "./Partials/Header";
 import BaseHeader from "../partials/BaseHeader";
 import BaseFooter from "../partials/BaseFooter";
 
-import useAxios from "../../utils/useAxios";
 import UserData from "../plugin/UserData";
 import Toast from "../plugin/Toast";
+import api from "../../utils/axios";
+import { showToast } from "../../utils/toast";
+import Spinner from "../../utils/Spinner";
 
 function TeacherNotification() {
     const [noti, setNoti] = useState([]);
+    const [loading, setLoading] = useState(false)
 
-    const fetchNoti = () => {
-        useAxios.get(`teacher/noti-list/${UserData()?.teacher_id}/`).then((res) => {
+    const teacherId = UserData()?.teacher_id
+
+    const fetchNoti = async() => {
+        setLoading(true)
+        try {
+            const res = await api.get(`teacher/notification-list/${teacherId}/`)
             setNoti(res.data);
             console.log(res.data);
-        });
+            setLoading(false)
+        } catch (error) {
+            console.log('error', error)
+            showToast('error', error.response?.data?.message || 'Something went wrong')
+        }
+       
     };
 
     useEffect(() => {
         fetchNoti();
     }, []);
 
-    const handleMarkAsSeen = (notiId) => {
-        const formdata = new FormData();
-
-        formdata.append("teacher", UserData()?.teacher_id);
-        formdata.append("pk", notiId);
-        formdata.append("seen", true);
-
-        useAxios.patch(`teacher/noti-detail/${UserData()?.teacher_id}/${notiId}`, formdata).then((res) => {
+    const handleMarkAsSeen = async(notiId) => {
+        try {
+            const res = await api.patch(`teacher/notification-detial/${teacherId}/${notiId}/`, {seen:true})
             console.log(res.data);
             fetchNoti();
-            Toast().fire({
-                icon: "success",
-                title: "Notication Seen",
-            });
-        });
+            showToast('success', 'Notification Seen')
+        } catch (error) {
+            console.log('error', error)
+            showToast('error', error.response?.data?.message || 'Something went wrong')
+        }
+        
     };
 
     return (
         <>
             <BaseHeader />
-
+            {loading ? <Spinner /> :
             <section className="pt-5 pb-5">
                 <div className="container">
                     {/* Header Here */}
@@ -103,7 +111,7 @@ function TeacherNotification() {
                         </div>
                     </div>
                 </div>
-            </section>
+            </section>}
 
             <BaseFooter />
         </>

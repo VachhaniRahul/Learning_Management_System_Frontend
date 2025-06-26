@@ -8,21 +8,30 @@ import Sidebar from "./Partials/Sidebar";
 import Header from "./Partials/Header";
 import UserData from "../plugin/UserData";
 import api from "../../utils/axios";
+import Spinner from "../../utils/Spinner";
+import { showToast } from "../../utils/toast";
 
 
 function Courses() {
     const [courses, setCourses] = useState([]);
     const [stats, setStats] = useState([]);
     const [fetching, setFetching] = useState(true);
+    const [loading, setLoading] = useState(false)
 
-    const fetchData = () => {
+    const fetchData = async () => {
         setFetching(true);
-
-        api.get(`student/course-list/${UserData()?.user_id}/`).then((res) => {
+        setLoading(true)
+        try {
+            console.log('courses')
+            const res = await api.get(`student/course-list/${UserData()?.user_id}/`)
             console.log(res.data);
             setCourses(res.data);
             setFetching(false);
-        });
+            setLoading(false)
+        } catch (error) {
+            console.log('error', error)
+            showToast('error', error.response?.data?.message || 'Something went wrong')
+        }
     };
 
     useEffect(() => {
@@ -44,7 +53,7 @@ function Courses() {
     return (
         <>
             <BaseHeader />
-
+            {loading ? <Spinner /> : 
             <section className="pt-5 pb-5">
                 <div className="container">
                     {/* Header Here */}
@@ -160,7 +169,7 @@ function Courses() {
                         </div>
                     </div>
                 </div>
-            </section>
+            </section>}
 
             <BaseFooter />
         </>

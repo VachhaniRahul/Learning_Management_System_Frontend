@@ -14,7 +14,7 @@ import Swal from "sweetalert2";
 import Cookie from "js-cookie";
 
 function CourseCreate() {
-    const [courseData, setCourseData] = useState({ title: "", description: "", image: "", file: "", level: "", language: "", price: "", category: "" });
+    const [courseData, setCourseData] = useState({ title: "", description: "", image: "", file: "", level: "", language: "", price: "", category: "", teacher_status: "" });
     const [imagePreview, setImagePreview] = useState("");
     const [loading, setLoading] = useState(false);
     const [loadingFile, setFileLoading] = useState(false);
@@ -252,6 +252,7 @@ function CourseCreate() {
                                                     <option value="French">French</option>
                                                 </select>
                                             </div>
+                                            
                                             <div className="mb-3">
                                                 <label className="form-label">Course Description</label>
                                                 <CKEditor

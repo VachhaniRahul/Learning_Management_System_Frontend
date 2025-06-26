@@ -8,24 +8,36 @@ import Sidebar from "./Partials/Sidebar";
 import Header from "./Partials/Header";
 import UserData from "../plugin/UserData";
 import api from "../../utils/axios";
+import Spinner from "../../utils/Spinner";
 
 function Dashboard() {
     const [courses, setCourses] = useState([]);
     const [stats, setStats] = useState([]);
     const [fetching, setFetching] = useState(true);
+    const [loading, setLoading] = useState(false)
 
-    const fetchData = () => {
+    const fetchData = async() => {
         setFetching(true);
-        api.get(`student/summary/${UserData()?.user_id}/`).then((res) => {
+        setLoading(true);
+        try {
+            const res = await api.get(`student/summary/${UserData()?.user_id}/`)
             console.log(res.data);
             setStats(res.data);
-        });
 
-        api.get(`student/course-list/${UserData()?.user_id}/`).then((res) => {
-            console.log(res.data);
-            setCourses(res.data);
+            const res1 = await api.get(`student/course-list/${UserData()?.user_id}/`)
+            console.log(res1.data);
+            setCourses(res1.data);
             setFetching(false);
-        });
+
+            setLoading(false)
+
+        } catch (error) {
+            console.log('error', error)
+            showToast('error', error.response?.data?.message || 'Something went wrong')
+        }
+
+
+        
     };
 
     useEffect(() => {
@@ -48,7 +60,7 @@ function Dashboard() {
     return (
         <>
             <BaseHeader />
-
+            {loading ? <Spinner /> :
             <section className="pt-5 pb-5">
                 <div className="container">
                     {/* Header Here */}
@@ -209,7 +221,7 @@ function Dashboard() {
                         </div>
                     </div>
                 </div>
-            </section>
+            </section>}
 
             <BaseFooter />
         </>
